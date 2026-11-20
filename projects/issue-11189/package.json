@@ -1,0 +1,15 @@
+{
+  "name": "rolldown-bundled-dev-memory-repro",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "tailwindcss": "latest",
+    "vite": "latest"
+  }
+}

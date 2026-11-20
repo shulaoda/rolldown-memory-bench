@@ -1,0 +1,24 @@
+[submodule "projects/lobehub"]
+	path = projects/lobehub
+	url = https://github.com/lobehub/lobehub.git
+	shallow = true
+	ignore = dirty
+	branch = canary
+[submodule "projects/vinext"]
+	path = projects/vinext
+	url = https://github.com/cloudflare/vinext.git
+	shallow = true
+	ignore = dirty
+	branch = main
+[submodule "projects/vue-vben-admin"]
+	path = projects/vue-vben-admin
+	url = https://github.com/vbenjs/vue-vben-admin.git
+	shallow = true
+	ignore = dirty
+	branch = main
+[submodule "projects/rolldown-9330-repro"]
+	path = projects/rolldown-9330-repro
+	url = https://github.com/cijiugechu/rolldown-9330-repro.git
+	shallow = true
+	ignore = dirty
+	branch = main
