@@ -81,12 +81,14 @@ const BINDING_PACKAGES = {
   darwin: ['darwin-arm64', 'darwin-x64'],
   linux: ['linux-x64-gnu', 'linux-arm64-gnu', 'linux-x64-musl', 'linux-arm64-musl'],
   win32: ['win32-x64-msvc', 'win32-arm64-msvc'],
-}[process.platform] ?? [];
+}[process.platform]?.filter((suffix) => suffix.includes(`-${process.arch}`)) ?? [];
 
-// The loader takes a `.node` file next to the JS first, then the `@rolldown/binding-*` package.
+// The loader takes a `.node` file of this platform next to the JS first, then the
+// `@rolldown/binding-*` package. A repo shared by two systems can hold the files of both.
 function findBinding(pkgDir) {
+  const names = BINDING_PACKAGES.map((suffix) => `rolldown-binding.${suffix}.node`);
   for (const dir of [path.join(pkgDir, 'dist'), path.join(pkgDir, 'dist', 'shared')]) {
-    const file = fs.existsSync(dir) && fs.readdirSync(dir).find((name) => /^rolldown-binding\..+\.node$/.test(name));
+    const file = fs.existsSync(dir) && fs.readdirSync(dir).find((name) => names.includes(name));
     if (file) return path.join(dir, file);
   }
   const require = createRequire(path.join(pkgDir, 'package.json'));
