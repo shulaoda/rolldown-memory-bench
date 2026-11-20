@@ -15,7 +15,7 @@ update:
     git submodule update --init --remote --force --jobs 4
     node scripts/bench.mjs setup all
 
-# Run cases: just bench [names...] [--pr <number>] [--local[=<path>]] [--bin <spec>]. Without names it runs every API case.
+# Run cases: just bench [names...] [--pr <number>] [--local[=<path>]] [--bin <spec>]. Without names it runs every API case. Writes BENCHMARKS.md.
 bench *args:
     node scripts/bench.mjs run {{ args }}
 
@@ -23,6 +23,6 @@ bench *args:
 list:
     node scripts/bench.mjs list
 
-# Print the tables of a saved run again.
-report file:
-    node scripts/bench.mjs report {{ file }}
+# Print the tables of saved runs again and write BENCHMARKS.md from them. Several runs of the same --bin list are merged.
+report +files:
+    node scripts/bench.mjs report {{ files }}

@@ -35,8 +35,7 @@ export async function run({ rolldown, variant, input, mark, metric, sleep }) {
     await bundle.close();
     times.push(performance.now() - start);
   }
-  mark('after last build', { cheap: true });
-  metric('first build', times[0]);
   metric('later builds (median)', median(times.slice(1)));
+  metric('first build', times[0]);
   metric('later builds (max)', Math.max(...times.slice(1)));
 }

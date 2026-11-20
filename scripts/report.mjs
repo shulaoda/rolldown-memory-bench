@@ -11,17 +11,17 @@ function format(value, unit) {
 
 function rowsFor(runs) {
   const kind = runs[0].kind ?? {};
-  const rows = [{ label: `peak ${kind.peak ?? 'memory'} (MB)`, unit: 'MB', get: (r) => r.peak ?? r.maxRss }];
+  const rows = [{ id: 'peak', label: `peak ${kind.peak ?? 'memory'} (MB)`, unit: 'MB', get: (r) => r.peak ?? r.maxRss }];
   // A case that times its own builds also sleeps, so the process wall time says little there.
   const timed = runs.some((r) => Object.values(r.metrics ?? {}).some((m) => m.unit === 'ms'));
-  if (!timed) rows.push({ label: 'wall time', unit: 'ms', get: (r) => r.wall });
-  rows.push({ label: 'process cpu time', unit: 'ms', get: (r) => r.cpu });
+  if (!timed) rows.push({ id: 'wall', label: 'wall time', unit: 'ms', get: (r) => r.wall });
+  rows.push({ id: 'cpu', label: 'process cpu time', unit: 'ms', get: (r) => r.cpu });
   const seen = new Set();
   for (const run of runs) {
     for (const [name, { unit }] of Object.entries(run.metrics ?? {})) {
       if (seen.has(`m:${name}`)) continue;
       seen.add(`m:${name}`);
-      rows.push({ label: name, unit, get: (r) => r.metrics?.[name]?.value });
+      rows.push({ id: 'metric', name, label: name, unit, get: (r) => r.metrics?.[name]?.value });
     }
   }
   for (const run of runs) {
@@ -29,46 +29,46 @@ function rowsFor(runs) {
       if (seen.has(`k:${mark.label}`)) continue;
       seen.add(`k:${mark.label}`);
       const memKind = mark.memKind ?? kind.mem ?? 'mem';
-      rows.push({ label: `${memKind} @ ${mark.label} (MB)`, unit: 'MB', get: (r) => r.marks?.find((m) => m.label === mark.label)?.mem });
+      const get = (r) => r.marks?.find((m) => m.label === mark.label)?.mem;
+      rows.push({ id: 'mark', name: mark.label, label: `${memKind} @ ${mark.label} (MB)`, unit: 'MB', get });
     }
   }
   if (runs.some((r) => r.rustPeak != null)) {
-    rows.push({ label: 'rust heap peak (MB)', unit: 'MB', get: (r) => r.rustPeak });
+    rows.push({ id: 'rust', label: 'rust heap peak (MB)', unit: 'MB', get: (r) => r.rustPeak });
   }
   for (const run of runs) {
     for (const mark of run.marks ?? []) {
       if (mark.rustLive == null || seen.has(`r:${mark.label}`)) continue;
       seen.add(`r:${mark.label}`);
-      rows.push({ label: `rust heap @ ${mark.label} (MB)`, unit: 'MB', get: (r) => r.marks?.find((m) => m.label === mark.label)?.rustLive });
+      const get = (r) => r.marks?.find((m) => m.label === mark.label)?.rustLive;
+      rows.push({ id: 'rust', label: `rust heap @ ${mark.label} (MB)`, unit: 'MB', get });
     }
   }
   return rows;
 }
 
-function table(lines) {
-  const widths = lines[0].map((_, i) => Math.max(...lines.map((line) => line[i].length)));
-  return lines.map((line) => line.map((cell, i) => cell.padEnd(widths[i])).join('   ').trimEnd()).join('\n');
-}
+const percent = (pct) => `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
-// One table per case and variant: median (min-max) for each target, and the change from the first target.
-export function summarize(record) {
+// One group per case and variant. Each row has the median (min-max) of every target, and the
+// change of every later target from the first one.
+function groups(record) {
   const names = record.targets.map((t) => t.name);
-  const groups = new Map();
+  const byKey = new Map();
   for (const run of record.runs) {
     const key = run.variant ? `${run.case}:${run.variant}` : run.case;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(run);
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(run);
   }
-  const out = [];
-  for (const [key, runs] of groups) {
+  return [...byKey].map(([key, runs]) => {
     const ok = runs.filter((r) => r.ok);
-    const failed = runs.length - ok.length;
-    const rounds = Math.max(...runs.map((r) => r.round + 1));
-    out.push(`\n${key}  (${rounds} rounds${failed ? `, ${failed} failed` : ''})`);
-    if (ok.length === 0) continue;
-    const header = ['', ...names];
-    for (const name of names.slice(1)) header.push(`${name} vs ${names[0]}`);
-    const lines = [header];
+    const group = {
+      key,
+      case: runs[0].case,
+      rounds: Math.max(...runs.map((r) => r.round + 1)),
+      failed: runs.length - ok.length,
+      rows: [],
+    };
+    if (ok.length === 0) return group;
     for (const row of rowsFor(ok)) {
       const medians = [];
       const cells = names.map((name) => {
@@ -83,14 +83,132 @@ export function summarize(record) {
         const max = Math.max(...values);
         return values.length > 1 ? `${format(m, row.unit)} (${format(min, row.unit)}-${format(max, row.unit)})` : format(m, row.unit);
       });
-      const deltas = medians.slice(1).map((m) => {
-        if (m == null || !medians[0]) return '-';
-        const pct = ((m - medians[0]) / medians[0]) * 100;
-        return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
-      });
-      lines.push([row.label, ...cells, ...deltas]);
+      const deltas = medians.slice(1).map((m) => (m == null || !medians[0] ? '-' : percent(((m - medians[0]) / medians[0]) * 100)));
+      group.rows.push({ ...row, cells, deltas });
     }
-    out.push(table(lines));
+    return group;
+  });
+}
+
+function textTable(lines) {
+  const widths = lines[0].map((_, i) => Math.max(...lines.map((line) => line[i].length)));
+  return lines.map((line) => line.map((cell, i) => cell.padEnd(widths[i])).join('   ').trimEnd()).join('\n');
+}
+
+function header(record) {
+  const names = record.targets.map((t) => t.name);
+  return ['', ...names, ...names.slice(1).map((name) => `${name} vs ${names[0]}`)];
+}
+
+const roundsText = (group) => `${group.rounds} rounds${group.failed ? `, ${group.failed} failed` : ''}`;
+
+export function summarize(record) {
+  const out = [];
+  for (const group of groups(record)) {
+    out.push(`\n${group.key}  (${roundsText(group)})`);
+    if (group.rows.length === 0) continue;
+    out.push(textTable([header(record), ...group.rows.map((row) => [row.label, ...row.cells, ...row.deltas])]));
   }
   return out.join('\n');
+}
+
+// Several saved runs of the same targets on the same machine, as one record. A case in a later
+// run replaces the same case in an earlier one.
+export function mergeRecords(records) {
+  const same = (a, b) => ['name', 'spec', 'git', 'bindingTime'].every((key) => a[key] === b[key]);
+  const machineKey = (m) => [m.platform, m.arch, m.cpu, m.memGB].join(' ');
+  const [first] = records;
+  for (const record of records.slice(1)) {
+    if (machineKey(record.machine) !== machineKey(first.machine)) {
+      throw new Error('These runs are from different machines. Numbers from different machines do not compare.');
+    }
+    if (record.targets.length !== first.targets.length || !record.targets.every((t, i) => same(t, first.targets[i]))) {
+      throw new Error('These runs measured different bins. Merge only runs of the same --bin list.');
+    }
+  }
+  const runs = new Map();
+  for (const record of records) {
+    const keys = new Set(record.runs.map((r) => `${r.case}:${r.variant}`));
+    for (const key of keys) runs.set(key, record.runs.filter((r) => `${r.case}:${r.variant}` === key));
+  }
+  return {
+    machine: records.at(-1).machine,
+    targets: records.at(-1).targets,
+    sources: records.flatMap((r) => r.sources ?? [{ date: r.machine.date, args: r.args }]),
+    runs: [...runs.values()].flat(),
+  };
+}
+
+const issueLinks = (issues = []) =>
+  issues.map((n) => `[#${n}](https://github.com/rolldown/rolldown/issues/${n})`).join(', ');
+const mdRow = (cells) => `| ${cells.map((c) => String(c).replaceAll('|', '\\|')).join(' | ')} |`;
+
+function binSource(target) {
+  if (target.kind === 'npm') return `npm \`${target.spec}\``;
+  if (target.kind === 'preview') return `pkg.pr.new \`${target.spec}\``;
+  return `${target.kind} \`${target.spec}\``;
+}
+
+// `info` maps a case or project id to its `{ title, issues }`.
+export function markdown(record, info = new Map()) {
+  const names = record.targets.map((t) => t.name);
+  const m = record.machine;
+  const sources = record.sources ?? [{ date: m.date, args: record.args }];
+  const order = [...info.keys()];
+  const rank = (group) => (order.includes(group.case) ? order.indexOf(group.case) : order.length);
+  const all = groups(record).sort((a, b) => rank(a) - rank(b));
+  const kind = record.runs.find((r) => r.kind)?.kind ?? {};
+  const lines = [
+    '# Benchmarks',
+    '',
+    '`just bench` writes this file after every run, and `just report <results.json> ...` writes it again from saved runs.',
+    '',
+    `- Machine: ${m.platform} ${m.arch} (${m.release}), ${m.cpu}, ${m.cores} cores, ${m.memGB} GB, Node ${m.node}`,
+    ...sources.map((s) => `- Run ${s.date.slice(0, 16).replace('T', ' ')} UTC: \`just bench ${s.args.slice(1).join(' ')}\``),
+    `- Memory: \`${kind.mem ?? 'rss'}\`, peak: the highest \`${kind.peak ?? 'rss'}\` of the process. Numbers compare only on the same machine.`,
+    '',
+    mdRow(['Bin', 'rolldown', 'From', 'Commit']),
+    mdRow(['---', '---', '---', '---']),
+    ...record.targets.map((t) => mdRow([t.name, t.version, binSource(t), t.git ?? '-'])),
+    '',
+    `Every number is the median over the rounds, with the range in parentheses. A change is from \`${names[0]}\`.`,
+    '',
+    '## Summary',
+    '',
+  ];
+
+  const later = names.slice(1);
+  const change = (row) => (row ? row.deltas.map((d, i) => (later.length > 1 ? `${later[i]} ${d}` : d)).join('<br>') : '-');
+  const labeled = (row) => (row ? `${change(row)} (${row.name ?? row.label})` : '-');
+  lines.push(mdRow(['Case', 'Peak', 'CPU time', 'Time', 'Memory at the last mark']));
+  lines.push(mdRow(['---', '---:', '---:', '---:', '---:']));
+  for (const group of all) {
+    if (group.rows.length === 0) {
+      lines.push(mdRow([group.key, 'failed', '', '', '']));
+      continue;
+    }
+    const peak = group.rows.find((r) => r.id === 'peak');
+    const cpu = group.rows.find((r) => r.id === 'cpu');
+    const time = group.rows.find((r) => r.id === 'wall') ?? group.rows.find((r) => r.id === 'metric' && r.unit === 'ms');
+    const lastMark = group.rows.filter((r) => r.id === 'mark').at(-1);
+    lines.push(mdRow([group.key, change(peak), change(cpu), labeled(time), labeled(lastMark)]));
+  }
+
+  let current = null;
+  for (const group of all) {
+    if (group.case !== current) {
+      current = group.case;
+      const { title, issues } = info.get(group.case) ?? {};
+      if (lines.at(-1) !== '') lines.push('');
+      lines.push(`## ${group.case}`, '');
+      if (title) lines.push(issues?.length ? `${title}. Issues: ${issueLinks(issues)}.` : `${title}.`, '');
+    }
+    lines.push(`### ${group.key}`, '', `${roundsText(group)}.`, '');
+    if (group.rows.length === 0) continue;
+    const head = header(record);
+    lines.push(mdRow(head), mdRow(head.map((_, i) => (i ? '---:' : '---'))));
+    for (const row of group.rows) lines.push(mdRow([row.label, ...row.cells, ...row.deltas]));
+    lines.push('');
+  }
+  return `${lines.join('\n').trimEnd()}\n`;
 }

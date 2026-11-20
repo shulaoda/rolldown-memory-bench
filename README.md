@@ -21,12 +21,17 @@ just bench --local                           # ../rolldown against the newest re
 just bench --local=../rolldown-wt-11655 --pr 11655
 just bench issue-11143-api-idle --bin ../rolldown-wt-11655
 just bench lobehub:build-sourcemap --bin a=./a.node --bin b=./b.node --base ../rolldown
-just report results/<run>/results.json
+just report results/<run>/results.json       # print a saved run again, and write BENCHMARKS.md from it
 just update                                  # move every project to its newest commit
 ```
 
 `just setup` can be run again at any time. It only redoes what changed. Results go to
 `results/<date>-<platform>-<arch>/`, with `results.json` and one log per run.
+
+Every `just bench` also writes [BENCHMARKS.md](BENCHMARKS.md): the machine, the bins, a summary
+with one row per case, and the full tables. `just report` writes it again from saved runs. Give it
+several `results.json` of the same `--bin` list on the same machine, and it merges them, so a case
+run again later replaces its old numbers.
 
 ## What to measure: `--pr`, `--local` and `--bin`
 
@@ -147,6 +152,7 @@ To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set 
 - `cases/`: the API cases
 - `projects/`: one `<id>.mjs` per project, and the project itself in `projects/<id>/`
 - `.cache/`: inputs, npm installs and tools, made by setup. `results/`: the runs.
+- `BENCHMARKS.md`: the tables of the last run
 
 ## Notes
 

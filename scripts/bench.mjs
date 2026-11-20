@@ -7,17 +7,19 @@ import { parseArgs } from 'node:util';
 import { runDev } from './dev.mjs';
 import { KIND, prepareTools } from './memory.mjs';
 import { setupProject, switchProject } from './projects.mjs';
-import { summarize } from './report.mjs';
+import { markdown, mergeRecords, summarize } from './report.mjs';
 import { CHILD, runNode, tail } from './runner.mjs';
 import { parseTarget, resolveTarget, sameFile } from './targets.mjs';
 import { RESULTS, ROOT } from './util.mjs';
+
+const BENCHMARKS = path.join(ROOT, 'BENCHMARKS.md');
 
 const HELP = `Usage (\`just bench\` is \`run\`):
   node scripts/bench.mjs list
   node scripts/bench.mjs run [<name>[:<variant>] ...] [--pr <number>] [--bin [label=]<spec>] ...
                              [--rounds N] [--env K=V]
   node scripts/bench.mjs setup [<name> ...]
-  node scripts/bench.mjs report <results.json>
+  node scripts/bench.mjs report <results.json> ...
 
 A name is a case or a project from \`list\`, or a group: cases (the default), projects, all.
 
@@ -38,6 +40,8 @@ A --bin spec is one of:
                           or from --base <spec>.
 
 Each round runs every --bin once in a fresh process, and the order flips every round.
+A run writes its tables to BENCHMARKS.md. \`report\` writes it again from saved runs, and merges
+several runs of the same --bin list.
 
 Examples:
   just bench --pr 11655
@@ -83,6 +87,12 @@ async function loadDefinitions() {
     cases: await load('cases', (mod) => ({ mod, meta: mod.meta, variants: mod.meta.variants })),
     projects: await load('projects', (mod) => ({ project: mod.default, meta: mod.default, variants: mod.default.cases })),
   };
+}
+
+function caseInfo(defs) {
+  const info = new Map();
+  for (const [id, { meta }] of [...defs.cases, ...defs.projects]) info.set(id, { title: meta.title, issues: meta.issues });
+  return info;
 }
 
 function select(names, defs) {
@@ -170,7 +180,8 @@ async function runOne(job, variant, bin, input, { log, probeDir, env }) {
 }
 
 async function run(names) {
-  const jobs = select(names, await loadDefinitions());
+  const defs = await loadDefinitions();
+  const jobs = select(names, defs);
   const bins = await resolveBins({ baseline: true });
   prepareTools();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -224,7 +235,8 @@ async function run(names) {
     }
   }
   console.log(summarize(record));
-  console.log(`\nSaved ${path.join(runDir, 'results.json')}`);
+  fs.writeFileSync(BENCHMARKS, markdown(record, caseInfo(defs)));
+  console.log(`\nSaved ${path.join(runDir, 'results.json')} and ${BENCHMARKS}`);
 }
 
 async function list() {
@@ -257,7 +269,12 @@ try {
     for (const job of jobs) await setup(job, bin);
     console.log('Setup done.');
   } else if (command === 'report') {
-    console.log(summarize(JSON.parse(fs.readFileSync(names[0], 'utf8'))));
+    if (names.length === 0) throw new Error('Pass one or more results.json files.');
+    const records = names.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
+    const record = records.length > 1 ? mergeRecords(records) : records[0];
+    console.log(summarize(record));
+    fs.writeFileSync(BENCHMARKS, markdown(record, caseInfo(await loadDefinitions())));
+    console.log(`\nWrote ${BENCHMARKS}`);
   } else throw new Error(`Unknown command "${command}"\n\n${HELP}`);
 } catch (error) {
   console.error(`error: ${error.message}`);

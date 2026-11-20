@@ -1,0 +1,475 @@
+# Benchmarks
+
+`just bench` writes this file after every run, and `just report <results.json> ...` writes it again from saved runs.
+
+- Machine: darwin arm64 (27.0.0), Apple M4 Pro, 14 cores, 48 GB, Node v26.0.0
+- Run 2026-11-19 23:28 UTC: `just bench all --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim`
+- Run 2026-11-20 00:50 UTC: `just bench rebuild-gaps --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim`
+- Memory: `phys_footprint`, peak: the highest `phys_footprint` of the process. Numbers compare only on the same machine.
+
+| Bin | rolldown | From | Commit |
+| --- | --- | --- | --- |
+| base | 1.3.3 | pkg.pr.new `commit:872275c` | 872275c |
+| pr-11655 | 1.3.3 | repo `../rolldown-memory-reclaim` | 727aecdc83 |
+
+Every number is the median over the rounds, with the range in parentheses. A change is from `base`.
+
+## Summary
+
+| Case | Peak | CPU time | Time | Memory at the last mark |
+| --- | ---: | ---: | ---: | ---: |
+| held-outputs:sourcemap | -1.4% | +0.5% | -1.1% (all builds) | -97.6% (idle 2s) |
+| held-outputs:plain | -1.3% | +0.1% | -1.4% (all builds) | -96.1% (idle 2s) |
+| issue-10985-tight-loop:close | +3.1% | +1.6% | +0.8% (all builds) | -95.4% (idle 5s) |
+| issue-10985-tight-loop:generate | +1.4% | +0.3% | +0.3% (all builds) | -95.4% (idle 5s) |
+| issue-11143-api-idle:6-builds | +5.2% | +2.4% | -0.6% (all builds) | -90.3% (idle 12s) |
+| issue-11143-api-idle:1-build | +0.6% | +4.3% | -1.6% (all builds) | -81.1% (idle 12s) |
+| issue-11233-optimizer-threads:default-threads | +4.5% | +2.0% | -0.3% (build) | -90.3% (idle 10s) |
+| issue-11233-optimizer-threads:4-threads | +0.6% | +1.6% | -0.1% (build) | -90.2% (idle 10s) |
+| many-chunks:plain | -1.4% | +4.5% | +0.2% (build) | -86.0% (idle 2s) |
+| many-chunks:sourcemap | +0.2% | +3.9% | +0.7% (build) | -86.4% (idle 2s) |
+| rebuild-gaps:gap-0 | -25.0% | +0.1% | -2.6% (later builds (median)) | -28.1% (before build 10) |
+| rebuild-gaps:gap-300ms | -28.6% | -0.3% | -1.5% (later builds (median)) | -34.9% (before build 10) |
+| rebuild-gaps:gap-1s | -29.2% | +7.3% | +2.2% (later builds (median)) | -85.6% (before build 10) |
+| rebuild-gaps:gap-3s | -29.1% | +9.4% | +4.1% (later builds (median)) | -86.1% (before build 10) |
+| three10x:plain | +0.6% | +3.4% | -0.1% (build) | -91.9% (idle 2s) |
+| three10x:sourcemap | +1.0% | +4.0% | +0.4% (build) | -93.4% (idle 2s) |
+| three10x:sourcemap-minify | -0.8% | +4.3% | +0.4% (build) | -93.7% (idle 2s) |
+| issue-11189:bundled | -40.1% | +17.8% | 0.0% (ready) | -68.6% (edit 20) |
+| issue-11189:unbundled | 0.0% | -1.2% | -0.2% (ready) | -6.8% (edit 20) |
+| issue-11189:bundled-gc | -45.1% | +16.6% | -1.0% (ready) | -68.3% (edit 20) |
+| issue-11189:bundled-tailwind-leaf | -4.2% | +0.2% | -1.0% (ready) | -20.0% (edit 20) |
+| lobehub:build | -0.2% | +1.1% | +0.2% (wall time) | - |
+| lobehub:build-sourcemap | +5.2% | +0.7% | -0.0% (wall time) | - |
+| lobehub:dev | -0.0% | -0.4% | +4.0% (ready) | -22.7% (idle 30s) |
+| rolldown-9330-repro:dev | -1.0% | +0.4% | 0.0% (ready) | -61.6% (idle 30s) |
+| vinext:build | +1.0% | +0.1% | 0.0% (wall time) | - |
+| vinext:playground-build | -2.5% | +0.2% | +0.2% (wall time) | - |
+| vue-vben-admin:build | -1.2% | +1.5% | -1.5% (wall time) | - |
+
+## held-outputs
+
+three.js x10, 10 back-to-back builds that keep their outputs (dashboard shape).
+
+### held-outputs:sourcemap
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1975 (1896-1983) | 1947 (1908-1957) | -1.4% |
+| process cpu time | 8.28s (8.25s-8.28s) | 8.33s (8.31s-8.41s) | +0.5% |
+| all builds | 2.35s (2.35s-2.53s) | 2.32s (2.32s-2.34s) | -1.1% |
+| phys_footprint @ 10 outputs held (MB) | 1914 (1814-1921) | 1866 (1864-1880) | -2.5% |
+| phys_footprint @ after gc (MB) | 1915 (1815-1922) | 1867 (1864-1880) | -2.5% |
+| phys_footprint @ idle 2s (MB) | 1915 (1815-1922) | 45.5 (45.3-48.2) | -97.6% |
+
+### held-outputs:plain
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1171 (1140-1173) | 1155 (1136-1165) | -1.3% |
+| process cpu time | 7.51s (7.49s-7.62s) | 7.52s (7.50s-7.56s) | +0.1% |
+| all builds | 1.91s (1.89s-2.03s) | 1.89s (1.88s-1.90s) | -1.4% |
+| phys_footprint @ 10 outputs held (MB) | 1129 (1099-1132) | 1113 (1095-1123) | -1.4% |
+| phys_footprint @ after gc (MB) | 1130 (1099-1132) | 1113 (1095-1123) | -1.4% |
+| phys_footprint @ idle 2s (MB) | 1130 (1099-1132) | 44.0 (43.6-47.3) | -96.1% |
+
+## issue-10985-tight-loop
+
+Memory across 150 builds in a tight loop, then idle. Issues: [#10985](https://github.com/rolldown/rolldown/issues/10985), [#10984](https://github.com/rolldown/rolldown/issues/10984).
+
+### issue-10985-tight-loop:close
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 791 (780-817) | 815 (799-830) | +3.1% |
+| process cpu time | 11.96s (11.92s-12.00s) | 12.15s (12.02s-12.26s) | +1.6% |
+| all builds | 3.08s (3.08s-3.10s) | 3.11s (3.07s-3.13s) | +0.8% |
+| phys_footprint @ build 25 (MB) | 534 (512-550) | 574 (537-586) | +7.5% |
+| phys_footprint @ build 50 (MB) | 640 (613-657) | 708 (648-712) | +10.6% |
+| phys_footprint @ build 75 (MB) | 700 (688-728) | 731 (695-751) | +4.5% |
+| phys_footprint @ build 100 (MB) | 746 (727-769) | 776 (767-796) | +4.0% |
+| phys_footprint @ build 125 (MB) | 777 (770-799) | 810 (787-815) | +4.2% |
+| phys_footprint @ build 150 (MB) | 791 (780-817) | 815 (799-830) | +3.1% |
+| phys_footprint @ idle 5s (MB) | 791 (780-817) | 36.7 (36.6-37.1) | -95.4% |
+
+### issue-10985-tight-loop:generate
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 784 (756-803) | 795 (715-797) | +1.4% |
+| process cpu time | 12.01s (12.00s-12.02s) | 12.04s (11.94s-12.10s) | +0.3% |
+| all builds | 3.07s (3.06s-3.10s) | 3.08s (3.07s-3.10s) | +0.3% |
+| phys_footprint @ build 25 (MB) | 528 (523-575) | 546 (517-553) | +3.5% |
+| phys_footprint @ build 50 (MB) | 690 (657-694) | 686 (626-686) | -0.6% |
+| phys_footprint @ build 75 (MB) | 711 (691-725) | 720 (646-723) | +1.3% |
+| phys_footprint @ build 100 (MB) | 750 (724-750) | 752 (679-756) | +0.3% |
+| phys_footprint @ build 125 (MB) | 774 (748-782) | 779 (708-782) | +0.7% |
+| phys_footprint @ build 150 (MB) | 784 (756-803) | 795 (715-797) | +1.4% |
+| phys_footprint @ idle 5s (MB) | 784 (756-803) | 36.2 (36.1-37.2) | -95.4% |
+
+## issue-11143-api-idle
+
+API builds with in-memory files and maps, then outputs dropped and idle. Issues: [#11143](https://github.com/rolldown/rolldown/issues/11143).
+
+### issue-11143-api-idle:6-builds
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1677 (1657-1757) | 1763 (1748-1779) | +5.2% |
+| process cpu time | 4.84s (4.83s-4.89s) | 4.96s (4.93s-4.96s) | +2.4% |
+| all builds | 1.72s (1.71s-1.72s) | 1.71s (1.70s-1.72s) | -0.6% |
+| phys_footprint @ before builds (MB) | 80.9 (80.9-81.8) | 81.1 (81.0-81.2) | +0.2% |
+| phys_footprint @ outputs held (MB) | 1620 (1591-1696) | 1693 (1656-1724) | +4.5% |
+| phys_footprint @ idle 1.5s (MB) | 1622 (1593-1697) | 158 (152-158) | -90.3% |
+| phys_footprint @ idle 4s (MB) | 1622 (1593-1698) | 158 (152-158) | -90.3% |
+| phys_footprint @ idle 12s (MB) | 1622 (1593-1698) | 158 (152-158) | -90.3% |
+
+### issue-11143-api-idle:1-build
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 789 (788-798) | 794 (793-801) | +0.6% |
+| process cpu time | 1.06s (1.05s-1.07s) | 1.11s (1.08s-1.12s) | +4.3% |
+| all builds | 296ms (296ms-299ms) | 292ms (291ms-301ms) | -1.6% |
+| phys_footprint @ before builds (MB) | 81.8 (81.0-82.7) | 81.3 (81.1-81.3) | -0.6% |
+| phys_footprint @ outputs held (MB) | 748 (747-756) | 739 (730-762) | -1.2% |
+| phys_footprint @ idle 1.5s (MB) | 750 (749-758) | 142 (141-142) | -81.1% |
+| phys_footprint @ idle 4s (MB) | 750 (749-758) | 142 (142-142) | -81.1% |
+| phys_footprint @ idle 12s (MB) | 750 (749-759) | 142 (142-142) | -81.1% |
+
+## issue-11233-optimizer-threads
+
+One optimizer-like pass over typescript, codemirror and vue, then idle. Issues: [#11233](https://github.com/rolldown/rolldown/issues/11233).
+
+### issue-11233-optimizer-threads:default-threads
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 372 (363-395) | 389 (367-397) | +4.5% |
+| process cpu time | 489ms (485ms-499ms) | 499ms (490ms-507ms) | +2.0% |
+| build | 264ms (261ms-280ms) | 263ms (262ms-267ms) | -0.3% |
+| phys_footprint @ output held (MB) | 359 (348-382) | 377 (354-384) | +4.9% |
+| phys_footprint @ idle 2s (MB) | 359 (349-382) | 34.7 (33.3-35.5) | -90.3% |
+| phys_footprint @ idle 10s (MB) | 360 (349-382) | 34.9 (33.4-35.7) | -90.3% |
+
+### issue-11233-optimizer-threads:4-threads
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 325 (321-337) | 327 (320-341) | +0.6% |
+| process cpu time | 429ms (427ms-434ms) | 436ms (436ms-442ms) | +1.6% |
+| build | 260ms (258ms-266ms) | 259ms (258ms-263ms) | -0.1% |
+| phys_footprint @ output held (MB) | 291 (280-307) | 304 (291-328) | +4.4% |
+| phys_footprint @ idle 2s (MB) | 292 (280-307) | 28.6 (27.8-28.8) | -90.2% |
+| phys_footprint @ idle 10s (MB) | 292 (280-307) | 28.6 (27.8-28.8) | -90.2% |
+
+## many-chunks
+
+three.js x10 with one dynamic import per file (about 3,700 chunks), one build.
+
+### many-chunks:plain
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 528 (521-530) | 520 (518-525) | -1.4% |
+| process cpu time | 1.20s (1.19s-1.21s) | 1.25s (1.22s-1.25s) | +4.5% |
+| build | 179ms (177ms-192ms) | 179ms (177ms-180ms) | +0.2% |
+| chunks | 3692 (3692-3692) | 3692 (3692-3692) | 0.0% |
+| phys_footprint @ output held (MB) | 523 (516-525) | 519 (514-523) | -0.9% |
+| phys_footprint @ after gc (MB) | 528 (521-530) | 520 (518-525) | -1.4% |
+| phys_footprint @ idle 2s (MB) | 528 (521-530) | 74.0 (73.7-74.9) | -86.0% |
+
+### many-chunks:sourcemap
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 643 (640-650) | 644 (638-647) | +0.2% |
+| process cpu time | 1.33s (1.31s-1.34s) | 1.39s (1.38s-1.41s) | +3.9% |
+| build | 210ms (203ms-228ms) | 212ms (209ms-231ms) | +0.7% |
+| chunks | 3692 (3692-3692) | 3692 (3692-3692) | 0.0% |
+| phys_footprint @ output held (MB) | 637 (635-643) | 641 (635-644) | +0.7% |
+| phys_footprint @ after gc (MB) | 643 (640-650) | 644 (638-647) | +0.2% |
+| phys_footprint @ idle 2s (MB) | 643 (640-650) | 87.5 (86.8-88.6) | -86.4% |
+
+## rebuild-gaps
+
+three.js x10 with sourcemap, 10 builds with a pause between them.
+
+### rebuild-gaps:gap-0
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1923 (1900-1980) | 1443 (1351-1502) | -25.0% |
+| process cpu time | 8.23s (8.17s-8.31s) | 8.23s (8.17s-8.28s) | +0.1% |
+| later builds (median) | 234ms (229ms-240ms) | 228ms (226ms-232ms) | -2.6% |
+| first build | 251ms (248ms-308ms) | 264ms (244ms-267ms) | +5.2% |
+| later builds (max) | 244ms (238ms-265ms) | 237ms (236ms-259ms) | -3.0% |
+| phys_footprint @ before build 2 (MB) | 598 (554-603) | 618 (573-636) | +3.4% |
+| phys_footprint @ before build 5 (MB) | 1155 (1122-1257) | 1066 (1047-1104) | -7.7% |
+| phys_footprint @ before build 10 (MB) | 1753 (1737-1787) | 1261 (1211-1346) | -28.1% |
+
+### rebuild-gaps:gap-300ms
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1896 (1866-1908) | 1353 (1274-1403) | -28.6% |
+| process cpu time | 9.27s (9.18s-9.75s) | 9.25s (9.07s-9.37s) | -0.3% |
+| later builds (median) | 242ms (239ms-258ms) | 239ms (238ms-247ms) | -1.5% |
+| first build | 254ms (246ms-260ms) | 246ms (244ms-283ms) | -3.0% |
+| later builds (max) | 253ms (252ms-279ms) | 251ms (245ms-263ms) | -1.0% |
+| phys_footprint @ before build 2 (MB) | 599 (546-626) | 600 (569-607) | +0.1% |
+| phys_footprint @ before build 5 (MB) | 1183 (1147-1222) | 1047 (1036-1107) | -11.4% |
+| phys_footprint @ before build 10 (MB) | 1678 (1671-1716) | 1093 (1060-1129) | -34.9% |
+
+### rebuild-gaps:gap-1s
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1883 (1860-1955) | 1333 (1326-1364) | -29.2% |
+| process cpu time | 9.49s (9.02s-9.89s) | 10.19s (9.95s-10.28s) | +7.3% |
+| later builds (median) | 250ms (240ms-258ms) | 255ms (245ms-256ms) | +2.2% |
+| first build | 251ms (249ms-266ms) | 268ms (251ms-280ms) | +6.6% |
+| later builds (max) | 258ms (252ms-292ms) | 264ms (258ms-274ms) | +2.4% |
+| phys_footprint @ before build 2 (MB) | 603 (553-609) | 174 (172-175) | -71.1% |
+| phys_footprint @ before build 5 (MB) | 1170 (1135-1204) | 226 (216-230) | -80.7% |
+| phys_footprint @ before build 10 (MB) | 1683 (1611-1736) | 242 (233-242) | -85.6% |
+
+### rebuild-gaps:gap-3s
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1881 (1875-1950) | 1335 (1319-1368) | -29.1% |
+| process cpu time | 9.30s (9.20s-9.49s) | 10.17s (9.93s-10.32s) | +9.4% |
+| later builds (median) | 235ms (232ms-245ms) | 244ms (239ms-250ms) | +4.1% |
+| first build | 245ms (240ms-256ms) | 243ms (241ms-267ms) | -0.4% |
+| later builds (max) | 246ms (243ms-261ms) | 255ms (252ms-260ms) | +3.6% |
+| phys_footprint @ before build 2 (MB) | 598 (547-628) | 173 (170-174) | -71.1% |
+| phys_footprint @ before build 5 (MB) | 1173 (1124-1203) | 223 (216-224) | -81.0% |
+| phys_footprint @ before build 10 (MB) | 1690 (1655-1707) | 235 (232-242) | -86.1% |
+
+## three10x
+
+three.js x10, one build: peak, output held, after GC, idle.
+
+### three10x:plain
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 515 (514-521) | 518 (514-523) | +0.6% |
+| process cpu time | 920ms (915ms-925ms) | 951ms (935ms-957ms) | +3.4% |
+| build | 197ms (197ms-198ms) | 197ms (195ms-211ms) | -0.1% |
+| phys_footprint @ output held (MB) | 473 (472-480) | 476 (472-482) | +0.6% |
+| phys_footprint @ after gc (MB) | 473 (472-480) | 476 (472-482) | +0.6% |
+| phys_footprint @ idle 2s (MB) | 474 (472-480) | 38.3 (38.0-38.7) | -91.9% |
+
+### three10x:sourcemap
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 652 (650-660) | 658 (648-662) | +1.0% |
+| process cpu time | 1.00s (978ms-1.00s) | 1.04s (1.02s-1.06s) | +4.0% |
+| build | 240ms (240ms-243ms) | 241ms (240ms-255ms) | +0.4% |
+| phys_footprint @ output held (MB) | 601 (565-624) | 592 (564-621) | -1.5% |
+| phys_footprint @ after gc (MB) | 601 (565-624) | 592 (564-621) | -1.5% |
+| phys_footprint @ idle 2s (MB) | 601 (565-624) | 39.7 (39.1-40.6) | -93.4% |
+
+### three10x:sourcemap-minify
+
+5 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 706 (688-726) | 700 (690-711) | -0.8% |
+| process cpu time | 1.06s (1.05s-1.08s) | 1.11s (1.09s-1.13s) | +4.3% |
+| build | 310ms (308ms-326ms) | 312ms (307ms-329ms) | +0.4% |
+| phys_footprint @ output held (MB) | 622 (589-674) | 598 (575-633) | -3.8% |
+| phys_footprint @ after gc (MB) | 622 (589-674) | 598 (575-633) | -3.8% |
+| phys_footprint @ idle 2s (MB) | 622 (589-674) | 39.1 (39.0-40.0) | -93.7% |
+
+## issue-11189
+
+Bundled dev rebuilds (synthetic React app, 1,500 modules). Issues: [#11189](https://github.com/rolldown/rolldown/issues/11189).
+
+### issue-11189:bundled
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 489 (488-510) | 293 (217-308) | -40.1% |
+| process cpu time | 2.44s (2.40s-2.48s) | 2.88s (2.83s-2.96s) | +17.8% |
+| ready | 513ms (512ms-514ms) | 513ms (508ms-514ms) | 0.0% |
+| phys_footprint @ after load (MB) | 154 (151-154) | 128 (124-131) | -16.7% |
+| phys_footprint @ edit 5 (MB) | 268 (267-270) | 155 (132-156) | -42.1% |
+| phys_footprint @ edit 10 (MB) | 377 (361-377) | 240 (135-244) | -36.3% |
+| phys_footprint @ edit 15 (MB) | 433 (428-446) | 153 (133-155) | -64.6% |
+| phys_footprint @ edit 20 (MB) | 489 (488-510) | 154 (136-157) | -68.6% |
+
+### issue-11189:unbundled
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 190 (188-192) | 190 (190-194) | 0.0% |
+| process cpu time | 2.93s (2.83s-2.94s) | 2.89s (2.81s-2.94s) | -1.2% |
+| ready | 527ms (527ms-527ms) | 526ms (516ms-526ms) | -0.2% |
+| phys_footprint @ after load (MB) | 182 (181-183) | 178 (178-181) | -1.9% |
+| phys_footprint @ edit 5 (MB) | 182 (175-186) | 175 (170-183) | -3.9% |
+| phys_footprint @ edit 10 (MB) | 181 (176-186) | 170 (166-175) | -6.1% |
+| phys_footprint @ edit 15 (MB) | 178 (163-181) | 168 (152-169) | -6.0% |
+| phys_footprint @ edit 20 (MB) | 178 (141-179) | 166 (160-171) | -6.8% |
+
+### issue-11189:bundled-gc
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 394 (359-395) | 217 (204-218) | -45.1% |
+| process cpu time | 2.74s (2.74s-2.79s) | 3.20s (3.15s-3.22s) | +16.6% |
+| ready | 514ms (509ms-515ms) | 509ms (506ms-513ms) | -1.0% |
+| phys_footprint @ after load (MB) | 151 (145-154) | 122 (120-124) | -19.0% |
+| phys_footprint @ edit 5 (MB) | 242 (235-249) | 118 (117-123) | -51.3% |
+| phys_footprint @ edit 10 (MB) | 293 (281-301) | 121 (120-124) | -58.8% |
+| phys_footprint @ edit 15 (MB) | 335 (312-360) | 121 (121-125) | -63.7% |
+| phys_footprint @ edit 20 (MB) | 389 (359-394) | 123 (122-126) | -68.3% |
+
+### issue-11189:bundled-tailwind-leaf
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 165 (164-166) | 159 (156-160) | -4.2% |
+| process cpu time | 881ms (854ms-883ms) | 883ms (850ms-901ms) | +0.2% |
+| ready | 515ms (514ms-515ms) | 510ms (509ms-512ms) | -1.0% |
+| phys_footprint @ after load (MB) | 157 (153-159) | 130 (129-133) | -16.9% |
+| phys_footprint @ edit 5 (MB) | 164 (163-165) | 137 (136-141) | -16.7% |
+| phys_footprint @ edit 10 (MB) | 136 (136-138) | 110 (109-114) | -19.4% |
+| phys_footprint @ edit 15 (MB) | 136 (136-137) | 108 (107-113) | -20.1% |
+| phys_footprint @ edit 20 (MB) | 136 (136-137) | 109 (108-112) | -20.0% |
+
+## lobehub
+
+lobehub SPA. Issues: [#9330](https://github.com/rolldown/rolldown/issues/9330).
+
+### lobehub:build
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 5458 (5339-5470) | 5446 (5141-5494) | -0.2% |
+| wall time | 21.52s (21.49s-21.79s) | 21.56s (21.53s-21.73s) | +0.2% |
+| process cpu time | 43.80s (43.71s-44.60s) | 44.27s (43.91s-44.49s) | +1.1% |
+
+### lobehub:build-sourcemap
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 6751 (6395-7158) | 7105 (6473-7182) | +5.2% |
+| wall time | 23.55s (23.48s-23.81s) | 23.54s (23.54s-23.69s) | -0.0% |
+| process cpu time | 47.05s (46.96s-47.50s) | 47.36s (47.26s-47.90s) | +0.7% |
+
+### lobehub:dev
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 2961 (2932-3062) | 2960 (2949-3381) | -0.0% |
+| process cpu time | 60.89s (60.12s-61.60s) | 60.64s (60.41s-61.35s) | -0.4% |
+| ready | 1.49s (1.47s-1.49s) | 1.55s (1.48s-1.58s) | +4.0% |
+| phys_footprint @ ready (MB) | 832 (809-834) | 852 (829-870) | +2.4% |
+| phys_footprint @ page +25s (MB) | 2602 (2519-2604) | 2062 (1916-2207) | -20.8% |
+| phys_footprint @ idle 30s (MB) | 2478 (2371-2604) | 1916 (1897-2084) | -22.7% |
+
+## rolldown-9330-repro
+
+Small #9330 repro, vite dev with @lobehub/ui. Issues: [#9330](https://github.com/rolldown/rolldown/issues/9330).
+
+### rolldown-9330-repro:dev
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 2232 (2210-2256) | 2209 (2205-2236) | -1.0% |
+| process cpu time | 4.68s (4.66s-4.80s) | 4.70s (4.67s-4.71s) | +0.4% |
+| ready | 512ms (510ms-512ms) | 512ms (510ms-512ms) | 0.0% |
+| phys_footprint @ ready (MB) | 1172 (740-1187) | 1167 (1154-1171) | -0.5% |
+| phys_footprint @ page +25s (MB) | 2232 (2210-2256) | 856 (854-857) | -61.6% |
+| phys_footprint @ idle 30s (MB) | 2232 (2210-2256) | 856 (854-857) | -61.6% |
+
+## vinext
+
+vinext, Next.js on Vite.
+
+### vinext:build
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 640 (639-670) | 646 (638-653) | +1.0% |
+| wall time | 1.22s (1.21s-1.51s) | 1.22s (1.21s-1.23s) | 0.0% |
+| process cpu time | 2.53s (2.51s-2.56s) | 2.53s (2.50s-2.54s) | +0.1% |
+
+### vinext:playground-build
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1347 (1340-1365) | 1314 (1309-1319) | -2.5% |
+| wall time | 3.61s (3.60s-3.98s) | 3.62s (3.58s-3.65s) | +0.2% |
+| process cpu time | 7.25s (7.23s-7.32s) | 7.26s (7.24s-7.28s) | +0.2% |
+
+## vue-vben-admin
+
+vue-vben-admin, the web-antd app.
+
+### vue-vben-admin:build
+
+3 rounds.
+
+|  | base | pr-11655 | pr-11655 vs base |
+| --- | ---: | ---: | ---: |
+| peak phys_footprint (MB) | 1728 (1715-1742) | 1708 (1697-1712) | -1.2% |
+| wall time | 2.78s (2.73s-3.94s) | 2.74s (2.73s-2.75s) | -1.5% |
+| process cpu time | 6.82s (6.64s-6.82s) | 6.92s (6.82s-6.97s) | +1.5% |
