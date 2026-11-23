@@ -14,17 +14,20 @@ export default {
   cases: {
     build: build(),
     'build-sourcemap': build(['--sourcemap']),
-    // The #9330 steps: a cold dev server, Chrome on the page for 25 s, then idle.
+    // The steps of #9349: a cold dev server, Chrome on the page for 25 s, then idle. The JS heap
+    // is collected only 90 to 180 s after the page closes, and memory stops dropping by 270 s.
+    // No `--max-old-space-size`, like its `dev:spa` script.
     dev: {
       args: ['node_modules/vite/bin/vite.js', '--force'],
       clean: ['node_modules/.vite'],
-      env: { NODE_OPTIONS: '--max-old-space-size=8192' },
       async script({ open, mark, sleep }) {
         await mark('ready');
         await open('/', { wait: 25_000 });
-        await mark('page +25s');
-        await sleep(30_000);
-        await mark('idle 30s');
+        await mark('page closed');
+        for (const seconds of [90, 180, 270]) {
+          await sleep(90_000);
+          await mark(`idle ${seconds}s`);
+        }
       },
     },
   },

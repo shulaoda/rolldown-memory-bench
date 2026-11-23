@@ -107,8 +107,8 @@ With a binding built with the `tracking_allocator` feature, the tables also show
 
 | Project | Issues | Cases |
 | --- | --- | --- |
-| `lobehub` | #9330 | `build`, `build-sourcemap`, `dev` (Chrome on the page 25 s, then idle 30 s) |
-| `rolldown-9330-repro` | #9330 | `dev`, the reporter's small repro with `@lobehub/ui` |
+| `lobehub` | #9330 | `build`, `build-sourcemap`, `dev` (Chrome on the page 25 s, then 270 s idle) |
+| `rolldown-9330-repro` | #9330 | `dev`, the reporter's small repro with `@lobehub/ui` (Chrome on the page 25 s, then 90 s idle) |
 | `issue-11189` | #11189 | `bundled`, `unbundled`, `bundled-gc`, `bundled-tailwind-leaf`: 20 edits with requests |
 | `vue-vben-admin` | | `build` of `apps/web-antd` |
 | `vinext` | | `build` of its 33-route benchmark app, `playground-build` |
@@ -126,6 +126,10 @@ serves every `--bin`. The originals are kept, and setup puts them back before it
 Dev cases start the server with `--force` and an empty optimizer cache, wait until it answers,
 then follow the case script. The bench asks the server for its memory over IPC, so the numbers
 come from the same reader as the other cases.
+
+The #9330 dev cases follow the measure script of #9349: Chrome on the page for 25 s, close it,
+then read the memory every 90 s until it stops dropping. That takes 90 s for the small repro and
+270 s for lobehub, whose JS heap is collected only 90 to 180 s after the page closes.
 
 ## Adding a case
 

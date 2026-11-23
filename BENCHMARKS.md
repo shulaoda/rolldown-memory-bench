@@ -5,6 +5,8 @@
 - Machine: darwin arm64 (27.0.0), Apple M4 Pro, 14 cores, 48 GB, Node v26.0.0
 - Run 2026-11-19 23:28 UTC: `just bench all --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim`
 - Run 2026-11-20 00:50 UTC: `just bench rebuild-gaps --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim`
+- Run 2026-11-20 08:32 UTC: `just bench lobehub:build-sourcemap --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim --rounds 9`
+- Run 2026-11-23 04:47 UTC: `just bench lobehub:dev rolldown-9330-repro:dev --bin base=commit:872275c --bin pr-11655=../rolldown-memory-reclaim --rounds 2`
 - Memory: `phys_footprint`, peak: the highest `phys_footprint` of the process. Numbers compare only on the same machine.
 
 | Bin | rolldown | From | Commit |
@@ -40,9 +42,9 @@ Every number is the median over the rounds, with the range in parentheses. A cha
 | issue-11189:bundled-gc | -45.1% | +16.6% | -1.0% (ready) | -68.3% (edit 20) |
 | issue-11189:bundled-tailwind-leaf | -4.2% | +0.2% | -1.0% (ready) | -20.0% (edit 20) |
 | lobehub:build | -0.2% | +1.1% | +0.2% (wall time) | - |
-| lobehub:build-sourcemap | +5.2% | +0.7% | -0.0% (wall time) | - |
-| lobehub:dev | -0.0% | -0.4% | +4.0% (ready) | -22.7% (idle 30s) |
-| rolldown-9330-repro:dev | -1.0% | +0.4% | 0.0% (ready) | -61.6% (idle 30s) |
+| lobehub:build-sourcemap | +4.9% | +0.6% | -0.1% (wall time) | - |
+| lobehub:dev | +8.9% | +0.3% | -9.7% (ready) | -33.5% (idle 360s) |
+| rolldown-9330-repro:dev | +0.4% | -5.5% | 0.0% (ready) | -78.7% (idle 360s) |
 | vinext:build | +1.0% | +0.1% | 0.0% (wall time) | - |
 | vinext:playground-build | -2.5% | +0.2% | +0.2% (wall time) | - |
 | vue-vben-admin:build | -1.2% | +1.5% | -1.5% (wall time) | - |
@@ -398,26 +400,29 @@ lobehub SPA. Issues: [#9330](https://github.com/rolldown/rolldown/issues/9330).
 
 ### lobehub:build-sourcemap
 
-3 rounds.
+9 rounds.
 
 |  | base | pr-11655 | pr-11655 vs base |
 | --- | ---: | ---: | ---: |
-| peak phys_footprint (MB) | 6751 (6395-7158) | 7105 (6473-7182) | +5.2% |
-| wall time | 23.55s (23.48s-23.81s) | 23.54s (23.54s-23.69s) | -0.0% |
-| process cpu time | 47.05s (46.96s-47.50s) | 47.36s (47.26s-47.90s) | +0.7% |
+| peak phys_footprint (MB) | 6261 (6222-6928) | 6567 (6063-7246) | +4.9% |
+| wall time | 23.41s (22.82s-24.08s) | 23.38s (22.89s-23.77s) | -0.1% |
+| process cpu time | 46.94s (46.24s-48.34s) | 47.22s (46.81s-47.68s) | +0.6% |
 
 ### lobehub:dev
 
-3 rounds.
+2 rounds.
 
 |  | base | pr-11655 | pr-11655 vs base |
 | --- | ---: | ---: | ---: |
-| peak phys_footprint (MB) | 2961 (2932-3062) | 2960 (2949-3381) | -0.0% |
-| process cpu time | 60.89s (60.12s-61.60s) | 60.64s (60.41s-61.35s) | -0.4% |
-| ready | 1.49s (1.47s-1.49s) | 1.55s (1.48s-1.58s) | +4.0% |
-| phys_footprint @ ready (MB) | 832 (809-834) | 852 (829-870) | +2.4% |
-| phys_footprint @ page +25s (MB) | 2602 (2519-2604) | 2062 (1916-2207) | -20.8% |
-| phys_footprint @ idle 30s (MB) | 2478 (2371-2604) | 1916 (1897-2084) | -22.7% |
+| peak phys_footprint (MB) | 2983 (2931-3034) | 3248 (3243-3252) | +8.9% |
+| process cpu time | 61.26s (61.08s-61.43s) | 61.41s (61.29s-61.54s) | +0.3% |
+| ready | 1.55s (1.51s-1.58s) | 1.40s (1.24s-1.56s) | -9.7% |
+| phys_footprint @ ready (MB) | 858 (834-881) | 700 (526-875) | -18.4% |
+| phys_footprint @ page closed (MB) | 2666 (2519-2813) | 1933 (1781-2085) | -27.5% |
+| phys_footprint @ idle 90s (MB) | 2584 (2519-2648) | 1933 (1781-2085) | -25.2% |
+| phys_footprint @ idle 180s (MB) | 1870 (1859-1882) | 1295 (1267-1322) | -30.8% |
+| phys_footprint @ idle 270s (MB) | 1719 (1625-1813) | 1147 (1070-1224) | -33.3% |
+| phys_footprint @ idle 360s (MB) | 1725 (1625-1825) | 1147 (1071-1224) | -33.5% |
 
 ## rolldown-9330-repro
 
@@ -425,16 +430,19 @@ Small #9330 repro, vite dev with @lobehub/ui. Issues: [#9330](https://github.com
 
 ### rolldown-9330-repro:dev
 
-3 rounds.
+2 rounds.
 
 |  | base | pr-11655 | pr-11655 vs base |
 | --- | ---: | ---: | ---: |
-| peak phys_footprint (MB) | 2232 (2210-2256) | 2209 (2205-2236) | -1.0% |
-| process cpu time | 4.68s (4.66s-4.80s) | 4.70s (4.67s-4.71s) | +0.4% |
-| ready | 512ms (510ms-512ms) | 512ms (510ms-512ms) | 0.0% |
-| phys_footprint @ ready (MB) | 1172 (740-1187) | 1167 (1154-1171) | -0.5% |
-| phys_footprint @ page +25s (MB) | 2232 (2210-2256) | 856 (854-857) | -61.6% |
-| phys_footprint @ idle 30s (MB) | 2232 (2210-2256) | 856 (854-857) | -61.6% |
+| peak phys_footprint (MB) | 2191 (2178-2205) | 2201 (2196-2206) | +0.4% |
+| process cpu time | 4.70s (4.49s-4.90s) | 4.44s (4.38s-4.50s) | -5.5% |
+| ready | 517ms (516ms-518ms) | 517ms (516ms-518ms) | 0.0% |
+| phys_footprint @ ready (MB) | 767 (733-801) | 814 (797-831) | +6.1% |
+| phys_footprint @ page closed (MB) | 2191 (2178-2205) | 945 (918-972) | -56.9% |
+| phys_footprint @ idle 90s (MB) | 1598 (1548-1648) | 351 (342-361) | -78.0% |
+| phys_footprint @ idle 180s (MB) | 1549 (1548-1549) | 351 (342-361) | -77.3% |
+| phys_footprint @ idle 270s (MB) | 1522 (1521-1522) | 324 (316-331) | -78.7% |
+| phys_footprint @ idle 360s (MB) | 1522 (1521-1522) | 324 (317-332) | -78.7% |
 
 ## vinext
 
