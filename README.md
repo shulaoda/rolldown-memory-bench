@@ -23,6 +23,7 @@ just bench --local=../rolldown-wt-11655 --pr 11655
 just bench issue-11143-api-idle --bin ../rolldown-wt-11655
 just bench lobehub:build-sourcemap --bin a=./a.node --bin b=./b.node --base ../rolldown
 just report results/<run>/results.json       # print a saved run again, and write BENCHMARKS.md from it
+just report results/<linux run>/results.json --out BENCHMARKS-LINUX.md
 just update                                  # move every project to its newest commit
 ```
 
@@ -32,7 +33,8 @@ just update                                  # move every project to its newest 
 Every `just bench` also writes [BENCHMARKS.md](BENCHMARKS.md): the machine, the bins, a summary
 with one row per case, and the full tables. `just report` writes it again from saved runs. Give it
 several `results.json` of the same `--bin` list on the same machine, and it merges them, so a case
-run again later replaces its old numbers.
+run again later replaces its old numbers. `--out <file>` writes another file instead, for example
+`BENCHMARKS-LINUX.md` for the runs of a Linux machine, so they do not replace the macOS tables.
 
 ## What to measure: `--pr`, `--local` and `--bin`
 

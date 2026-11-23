@@ -12,14 +12,12 @@ import { CHILD, runNode, tail } from './runner.mjs';
 import { parseTarget, resolveTarget, sameFile } from './targets.mjs';
 import { RESULTS, ROOT } from './util.mjs';
 
-const BENCHMARKS = path.join(ROOT, 'BENCHMARKS.md');
-
 const HELP = `Usage (\`just bench\` is \`run\`):
   node scripts/bench.mjs list
   node scripts/bench.mjs run [<name>[:<variant>] ...] [--pr <number>] [--bin [label=]<spec>] ...
-                             [--rounds N] [--env K=V] [--no-warmup]
+                             [--rounds N] [--env K=V] [--no-warmup] [--out <file>]
   node scripts/bench.mjs setup [<name> ...]
-  node scripts/bench.mjs report <results.json> ...
+  node scripts/bench.mjs report <results.json> ... [--out <file>]
   node scripts/bench.mjs selftest
 
 A name is a case or a project from \`list\`, or a group: cases (the default), projects, all.
@@ -42,8 +40,8 @@ A --bin spec is one of:
 
 Each round runs every --bin once in a fresh process, and the order flips every round. Before the
 rounds of a case, one run of the first --bin warms the file cache, and its numbers are dropped.
-A run writes its tables to BENCHMARKS.md. \`report\` writes it again from saved runs, and merges
-several runs of the same --bin list.
+A run writes its tables to BENCHMARKS.md, or to the file of --out, such as BENCHMARKS-LINUX.md.
+\`report\` writes it again from saved runs, and merges several runs of the same --bin list.
 
 Examples:
   just bench --pr 11655
@@ -72,9 +70,13 @@ const { values, positionals } = parseArgs({
     rounds: { type: 'string', short: 'r' },
     env: { type: 'string', multiple: true },
     'no-warmup': { type: 'boolean' },
+    out: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
   },
 });
+
+// The markdown file a run or `report` writes, relative to the bench root.
+const outFile = () => path.resolve(ROOT, values.out ?? 'BENCHMARKS.md');
 
 async function loadDefinitions() {
   const load = async (dir, pick) => {
@@ -251,8 +253,8 @@ async function run(names) {
     }
   }
   console.log(summarize(record));
-  fs.writeFileSync(BENCHMARKS, markdown(record, caseInfo(defs)));
-  console.log(`\nSaved ${path.join(runDir, 'results.json')} and ${BENCHMARKS}`);
+  fs.writeFileSync(outFile(), markdown(record, caseInfo(defs)));
+  console.log(`\nSaved ${path.join(runDir, 'results.json')} and ${outFile()}`);
 }
 
 // Checks the memory reader of this machine: a child allocates 512 MiB and frees it.
@@ -314,8 +316,8 @@ try {
     const records = names.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
     const record = records.length > 1 ? mergeRecords(records) : records[0];
     console.log(summarize(record));
-    fs.writeFileSync(BENCHMARKS, markdown(record, caseInfo(await loadDefinitions())));
-    console.log(`\nWrote ${BENCHMARKS}`);
+    fs.writeFileSync(outFile(), markdown(record, caseInfo(await loadDefinitions())));
+    console.log(`\nWrote ${outFile()}`);
   } else throw new Error(`Unknown command "${command}"\n\n${HELP}`);
 } catch (error) {
   console.error(`error: ${error.message}`);
