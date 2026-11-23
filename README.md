@@ -149,7 +149,7 @@ matters, like the lobehub peak with sourcemaps, which moves by about 1 GB from r
 
 | Project | Issues | Cases |
 | --- | --- | --- |
-| `lobehub` | #9330 | `build`, `build-sourcemap`, `dev` (Chrome on the page 25 s, then 270 s idle) |
+| `lobehub` | #9330 | `build`, `build-sourcemap`, `dev` (Chrome on the page 25 s, then 270 s idle), `dev-warm` (the same steps with the deps cache of the run before, so rolldown bundles nothing) |
 | `rolldown-9330-repro` | #9330 | `dev`, the reporter's small repro with `@lobehub/ui` (Chrome on the page 25 s, then 90 s idle) |
 | `issue-11189` | #11189 | `bundled`, `unbundled`, `bundled-gc`, `bundled-tailwind-leaf`: 20 edits with requests |
 | `vue-vben-admin` | | `build` of `apps/web-antd` |
@@ -165,9 +165,9 @@ After install, every `rolldown` package in the project's pnpm store is replaced 
 `.cache/<platform>/slots/<id>`, and each run points that link at its `--bin`. So one install
 serves every `--bin`. The originals are kept, and setup puts them back before it installs again.
 
-Dev cases start the server with `--force` and an empty optimizer cache, wait until it answers,
-then follow the case script. The bench asks the server for its memory over IPC, so the numbers
-come from the same reader as the other cases.
+Dev cases start the server with `--force` and an empty optimizer cache, except `lobehub:dev-warm`,
+wait until it answers, then follow the case script. The bench asks the server for its memory over
+IPC, so the numbers come from the same reader as the other cases.
 
 The #9330 dev cases follow the measure script of #9349: Chrome on the page for 25 s, close it,
 then read the memory every 90 s until it stops dropping. That takes 90 s for the small repro and
