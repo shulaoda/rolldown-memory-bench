@@ -8,7 +8,7 @@ import { listFiles } from '../scripts/util.mjs';
 export const meta = {
   title: 'API builds with in-memory files and maps, then outputs dropped and idle',
   issues: [11143],
-  rounds: 3,
+  rounds: 5,
   variants: {
     '6-builds': { builds: 6 },
     '1-build': { builds: 1 },

@@ -123,14 +123,28 @@ export async function runDev({ dir, args, env, log, script, readyTimeout = 180_0
       sleep,
       // `gc` runs a full GC in the server first. The server needs `--expose-gc` for that.
       mark: (label, { gc = false } = {}) => ask({ action: 'mark', label, gc }),
-      crawl: (pathname = '/') => crawl(new URL(pathname, url).toString()),
+      // The counts show a run whose page or crawl did not load like the others.
+      async crawl(pathname = '/') {
+        const urls = await crawl(new URL(pathname, url).toString());
+        metrics['crawled urls'] = { value: urls, unit: 'count' };
+        return urls;
+      },
       async open(pathname = '/', { wait = 0 } = {}) {
         const browser = await launchBrowser();
         browsers.push(browser);
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+        let requests = 0;
+        let failed = 0;
+        page.on('response', (response) => {
+          requests++;
+          if (response.status() >= 400) failed++;
+        });
+        page.on('requestfailed', () => failed++);
         await page.goto(new URL(pathname, url).toString(), { waitUntil: 'load', timeout: 300_000 });
         await page.waitForTimeout(wait);
         await browser.close();
+        metrics['page requests'] = { value: requests, unit: 'count' };
+        metrics['failed requests'] = { value: failed, unit: 'count' };
       },
       edit(file, text) {
         const full = path.join(dir, file);

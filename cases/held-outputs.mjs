@@ -4,7 +4,7 @@ import { three10x } from '../scripts/inputs.mjs';
 // and JS has not collected the earlier outputs when the next build runs.
 export const meta = {
   title: 'three.js x10, 10 back-to-back builds that keep their outputs (dashboard shape)',
-  rounds: 3,
+  rounds: 5,
   variants: {
     sourcemap: { builds: 10, output: { sourcemap: true } },
     plain: { builds: 10, output: {} },

@@ -5,6 +5,7 @@ function median(values) {
 }
 
 function format(value, unit) {
+  if (unit === 'count') return String(Math.round(value));
   if (unit === 'ms') return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${Math.round(value)}ms`;
   return value >= 100 ? String(Math.round(value)) : value.toFixed(1);
 }
@@ -14,7 +15,7 @@ function rowsFor(runs) {
   const rows = [{ id: 'peak', label: `peak ${kind.peak ?? 'memory'} (MB)`, unit: 'MB', get: (r) => r.peak ?? r.maxRss }];
   // A case that times its own builds also sleeps, so the process wall time says little there.
   const timed = runs.some((r) => Object.values(r.metrics ?? {}).some((m) => m.unit === 'ms'));
-  if (!timed) rows.push({ id: 'wall', label: 'wall time', unit: 'ms', get: (r) => r.wall });
+  if (!timed) rows.push({ id: 'wall', label: 'process wall time', unit: 'ms', get: (r) => r.wall });
   rows.push({ id: 'cpu', label: 'process cpu time', unit: 'ms', get: (r) => r.cpu });
   const seen = new Set();
   for (const run of runs) {
@@ -49,6 +50,22 @@ function rowsFor(runs) {
 
 const percent = (pct) => `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
+// The change of `other` from `base`. Memory also shows the change in MB, since a small number can
+// change by a large percentage. A change is marked as noise when the ranges of the rounds overlap,
+// or when a side has fewer than 3 rounds: then it is not clear that the two differ. Two sides of 2
+// rounds each fall apart by chance one time in three, of 3 rounds one in ten, of 5 one in 126.
+function change(base, other, unit) {
+  if (!base || !other || !base.median) return '-';
+  const notes = [];
+  if (unit === 'MB') {
+    const diff = other.median - base.median;
+    notes.push(`${diff > 0 ? '+' : diff < 0 ? '-' : ''}${format(Math.abs(diff), unit)} MB`);
+  }
+  if (base.n < 3 || other.n < 3 || (other.min <= base.max && base.min <= other.max)) notes.push('noise');
+  const pct = percent(((other.median - base.median) / base.median) * 100);
+  return notes.length ? `${pct} (${notes.join(', ')})` : pct;
+}
+
 // One group per case and variant. Each row has the median (min-max) of every target, and the
 // change of every later target from the first one.
 function groups(record) {
@@ -66,24 +83,22 @@ function groups(record) {
       case: runs[0].case,
       rounds: Math.max(...runs.map((r) => r.round + 1)),
       failed: runs.length - ok.length,
+      loads: runs.map((r) => r.load).filter((load) => typeof load === 'number'),
       rows: [],
     };
     if (ok.length === 0) return group;
     for (const row of rowsFor(ok)) {
-      const medians = [];
-      const cells = names.map((name) => {
+      const stats = names.map((name) => {
         const values = ok.filter((r) => r.target === name).map(row.get).filter((v) => typeof v === 'number');
-        if (values.length === 0) {
-          medians.push(null);
-          return '-';
-        }
-        const m = median(values);
-        medians.push(m);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        return values.length > 1 ? `${format(m, row.unit)} (${format(min, row.unit)}-${format(max, row.unit)})` : format(m, row.unit);
+        if (values.length === 0) return null;
+        return { median: median(values), min: Math.min(...values), max: Math.max(...values), n: values.length };
       });
-      const deltas = medians.slice(1).map((m) => (m == null || !medians[0] ? '-' : percent(((m - medians[0]) / medians[0]) * 100)));
+      const cells = stats.map((s) => {
+        if (!s) return '-';
+        const m = format(s.median, row.unit);
+        return s.n > 1 ? `${m} (${format(s.min, row.unit)}-${format(s.max, row.unit)})` : m;
+      });
+      const deltas = stats.slice(1).map((s) => change(stats[0], s, row.unit));
       group.rows.push({ ...row, cells, deltas });
     }
     return group;
@@ -100,7 +115,11 @@ function header(record) {
   return ['', ...names, ...names.slice(1).map((name) => `${name} vs ${names[0]}`)];
 }
 
-const roundsText = (group) => `${group.rounds} rounds${group.failed ? `, ${group.failed} failed` : ''}`;
+function roundsText(group) {
+  const loads = group.loads.filter((load) => load > 0);
+  const load = loads.length ? `, load ${Math.min(...loads)} to ${Math.max(...loads)}` : '';
+  return `${group.rounds} round${group.rounds === 1 ? '' : 's'}${group.failed ? `, ${group.failed} failed` : ''}${load}`;
+}
 
 export function summarize(record) {
   const out = [];
@@ -158,6 +177,8 @@ export function markdown(record, info = new Map()) {
   const rank = (group) => (order.includes(group.case) ? order.indexOf(group.case) : order.length);
   const all = groups(record).sort((a, b) => rank(a) - rank(b));
   const kind = record.runs.find((r) => r.kind)?.kind ?? {};
+  // Windows has no load average and reports 0.
+  const loads = record.runs.map((r) => r.load).filter((load) => load > 0);
   const lines = [
     '# Benchmarks',
     '',
@@ -166,12 +187,13 @@ export function markdown(record, info = new Map()) {
     `- Machine: ${m.platform} ${m.arch} (${m.release}), ${m.cpu}, ${m.cores} cores, ${m.memGB} GB, Node ${m.node}`,
     ...sources.map((s) => `- Run ${s.date.slice(0, 16).replace('T', ' ')} UTC: \`just bench ${s.args.slice(1).join(' ')}\``),
     `- Memory: \`${kind.mem ?? 'rss'}\`, peak: the highest \`${kind.peak ?? 'rss'}\` of the process. Numbers compare only on the same machine.`,
+    ...(loads.length ? [`- Load average (1 min) when a run started: ${Math.min(...loads)} to ${Math.max(...loads)}, on ${m.cores} cores`] : []),
     '',
     mdRow(['Bin', 'rolldown', 'From', 'Commit']),
     mdRow(['---', '---', '---', '---']),
     ...record.targets.map((t) => mdRow([t.name, t.version, binSource(t), t.git ?? '-'])),
     '',
-    `Every number is the median over the rounds, with the range in parentheses. A change is from \`${names[0]}\`.`,
+    `Every number is the median over the rounds, with the range in parentheses. A change is from \`${names[0]}\`. A change marked noise is not a clear difference: its ranges overlap, or a side has fewer than 3 rounds.`,
     '',
     '## Summary',
     '',
@@ -179,7 +201,7 @@ export function markdown(record, info = new Map()) {
 
   const later = names.slice(1);
   const change = (row) => (row ? row.deltas.map((d, i) => (later.length > 1 ? `${later[i]} ${d}` : d)).join('<br>') : '-');
-  const labeled = (row) => (row ? `${change(row)} (${row.name ?? row.label})` : '-');
+  const labeled = (row) => (row ? `${row.name ?? row.label}: ${change(row)}` : '-');
   lines.push(mdRow(['Case', 'Peak', 'CPU time', 'Time', 'Memory at the last mark']));
   lines.push(mdRow(['---', '---:', '---:', '---:', '---:']));
   for (const group of all) {

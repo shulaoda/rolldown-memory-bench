@@ -6,7 +6,7 @@ import { synthetic } from '../scripts/inputs.mjs';
 export const meta = {
   title: 'Memory across 150 builds in a tight loop, then idle',
   issues: [10985, 10984],
-  rounds: 3,
+  rounds: 5,
   variants: {
     close: { builds: 150, fresh: true },
     generate: { builds: 150, fresh: false },

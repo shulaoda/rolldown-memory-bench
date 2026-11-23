@@ -19,6 +19,10 @@ update:
 bench *args:
     node scripts/bench.mjs run {{ args }}
 
+# Check that this machine reads memory right: allocate 512 MiB in a child, then free it.
+selftest:
+    node scripts/bench.mjs selftest
+
 # List the cases and projects.
 list:
     node scripts/bench.mjs list

@@ -17,9 +17,10 @@ const BENCHMARKS = path.join(ROOT, 'BENCHMARKS.md');
 const HELP = `Usage (\`just bench\` is \`run\`):
   node scripts/bench.mjs list
   node scripts/bench.mjs run [<name>[:<variant>] ...] [--pr <number>] [--bin [label=]<spec>] ...
-                             [--rounds N] [--env K=V]
+                             [--rounds N] [--env K=V] [--no-warmup]
   node scripts/bench.mjs setup [<name> ...]
   node scripts/bench.mjs report <results.json> ...
+  node scripts/bench.mjs selftest
 
 A name is a case or a project from \`list\`, or a group: cases (the default), projects, all.
 
@@ -39,7 +40,8 @@ A --bin spec is one of:
   path/to/x.node          a binding file. The JS comes from the rolldown package the file is in,
                           or from --base <spec>.
 
-Each round runs every --bin once in a fresh process, and the order flips every round.
+Each round runs every --bin once in a fresh process, and the order flips every round. Before the
+rounds of a case, one run of the first --bin warms the file cache, and its numbers are dropped.
 A run writes its tables to BENCHMARKS.md. \`report\` writes it again from saved runs, and merges
 several runs of the same --bin list.
 
@@ -69,6 +71,7 @@ const { values, positionals } = parseArgs({
     base: { type: 'string' },
     rounds: { type: 'string', short: 'r' },
     env: { type: 'string', multiple: true },
+    'no-warmup': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
 });
@@ -195,12 +198,24 @@ async function run(names) {
   for (const job of jobs) {
     const input = await setup(job, bins[0]);
     const rounds = Number(values.rounds ?? job.meta.rounds ?? 3);
+    // The first run of a case reads its files from disk, and it was up to 50% slower.
+    if (!values['no-warmup']) {
+      const variant = job.selected[0];
+      const log = path.join(runDir, 'logs', safe(`${job.id}:${variant}-warmup.log`));
+      const result = await runOne(job, variant, bins[0], input, { log, probeDir: path.join(runDir, 'probe'), env });
+      console.log(`[warmup] ${job.id}:${variant}  ${bins[0].name}  ${result.ok ? 'done, numbers dropped' : `FAILED, log ${log}`}`);
+    }
     for (const variant of job.selected) {
       for (let round = 0; round < rounds; round++) {
         for (const bin of round % 2 ? [...bins].reverse() : bins) {
           const name = `${job.id}:${variant}`;
           const log = path.join(runDir, 'logs', safe(`${name}-${bin.name}-${round + 1}.log`));
           const probeDir = path.join(runDir, 'probe');
+          // Other work on the machine moves the numbers, so the record keeps how busy it was.
+          const load = Math.round(os.loadavg()[0] * 10) / 10;
+          if (load > os.availableParallelism() / 4) {
+            console.log(`  WARNING: the machine is busy (load ${load} on ${os.availableParallelism()} cores), so numbers move more`);
+          }
           const result = await runOne(job, variant, bin, input, { log, probeDir, env });
           const report = result.report ?? {};
           const wrong = (report.bindings ?? []).filter((file) => !sameFile(file, bin.binding));
@@ -211,6 +226,7 @@ async function run(names) {
             variant,
             target: bin.name,
             round,
+            load,
             ok: result.ok,
             code: result.code,
             wall: result.wall,
@@ -225,7 +241,7 @@ async function run(names) {
           });
           save();
           const last = marks.at(-1);
-          const parts = [`peak ${peak ?? maxRss} MB`, `wall ${(result.wall / 1000).toFixed(2)}s`];
+          const parts = [`peak ${peak ?? maxRss} MB`, `wall ${(result.wall / 1000).toFixed(2)}s`, `load ${load}`];
           if (last) parts.push(`${last.label} ${last.mem} MB`);
           const status = result.ok ? parts.join('  ') : `FAILED (code ${result.code}, signal ${result.signal}), log ${log}`;
           console.log(`[${round + 1}/${rounds}] ${name}  ${bin.name}  ${status}`);
@@ -237,6 +253,30 @@ async function run(names) {
   console.log(summarize(record));
   fs.writeFileSync(BENCHMARKS, markdown(record, caseInfo(defs)));
   console.log(`\nSaved ${path.join(runDir, 'results.json')} and ${BENCHMARKS}`);
+}
+
+// Checks the memory reader of this machine: a child allocates 512 MiB and frees it.
+async function selftest() {
+  prepareTools();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-selftest-'));
+  const log = path.join(dir, 'selftest.log');
+  const child = path.join(ROOT, 'scripts', 'selftest.mjs');
+  const result = await runNode({ args: ['--expose-gc', child], env: {}, log, probeDir: path.join(dir, 'probe') });
+  if (!result.ok) throw new Error(`The selftest process failed:\n${tail(log)}`);
+  const { marks, peak } = result.report;
+  const [start, allocated, freed] = marks.map((mark) => mark.mem);
+  const checks = [
+    ['memory grows by 512 MiB', allocated - start, (mb) => Math.abs(mb - 512) <= 26],
+    ['the peak includes it', peak - allocated, (mb) => mb >= -1],
+    ['freed memory goes back', freed - start, (mb) => mb < 64],
+  ];
+  console.log(`memory metric: ${KIND.mem}, peak metric: ${KIND.peak}`);
+  console.log(`start ${start} MB, after allocating ${allocated} MB, peak ${peak} MB, after freeing ${freed} MB`);
+  for (const [name, mb, pass] of checks) {
+    console.log(`${pass(mb) ? 'pass' : 'FAIL'}  ${name} (${mb > 0 ? '+' : ''}${Math.round(mb * 10) / 10} MB)`);
+    if (!pass(mb)) process.exitCode = 1;
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 async function list() {
@@ -260,6 +300,7 @@ try {
   if (values.help || !command) console.log(HELP);
   else if (command === 'list') await list();
   else if (command === 'run') await run(names);
+  else if (command === 'selftest') await selftest();
   else if (command === 'setup') {
     const jobs = select(names.length ? names : ['all'], await loadDefinitions());
     // Projects need some rolldown to install against. The bench re-points it before every run.

@@ -14,6 +14,7 @@ Windows, with Node scripts only.
 
 ```sh
 just setup                                   # submodules, Playwright, inputs, project installs
+just selftest                                # check that this machine reads memory right
 just list
 just bench --pr 11655                        # the PR's preview against the newest release
 just bench lobehub --pr 11655                # every lobehub case
@@ -69,12 +70,16 @@ case, the default), `projects`, `all`.
 
 ## How a run works
 
-Every run is a fresh process. Each round runs every `--bin` once, and the order flips every
-round (A B, then B A). The tables show the median and the range over the rounds, and the change
-from the first `--bin`.
+Every run is a fresh process. Before the rounds of a case, one run of the first `--bin` warms
+the file cache, and its numbers are dropped (`--no-warmup` skips it). Then each round runs every
+`--bin` once, and the order flips every round (A B, then B A). The tables show the median and the
+range over the rounds, and the change from the first `--bin`.
 
 `--rounds N` overrides the default of a case. `--env K=V` sets an environment variable for every
 run, for example `--env MIMALLOC_ALLOW_THP=0`.
+
+Each run also records the 1-minute load average. The bench warns when it is above a quarter of
+the cores, and the tables show its range for every case.
 
 ## Metrics
 
@@ -90,6 +95,41 @@ On Windows, reading the commit takes PowerShell about half a second. Marks insid
 the working set instead, and the table labels them `rss`. The Windows code is not tested yet.
 
 With a binding built with the `tracking_allocator` feature, the tables also show the Rust heap.
+
+On Linux the peak (`VmHWM`) also counts file pages, such as the node binary and the binding, so
+it is about 45 MB above `RssAnon` at the same moment. Compare peaks with peaks, and marks with
+marks.
+
+A dev case reads the server process only, not the browser. A project build reports the process
+wall time, which includes Node startup and loading the vite config.
+
+## How reliable the numbers are
+
+Checked on an M4 Pro and on an arm64 Linux VM on 2026-11-23.
+
+- The reader. `just selftest` allocates 512 MiB in a child, frees it, and checks what the reader
+  saw. It passes on macOS and Linux. On macOS the helper reads the same as `vmmap` and
+  `footprint`. Run it once on every new machine, Windows above all.
+- Garbage collection. The `gc()` of the API cases collects every output object (checked with
+  `WeakRef`), so the idle marks are not held up by JS. Buffers that JS frees go back to the OS a
+  few seconds after the GC.
+- The first run of a case read its files from disk and took up to 50% longer. The warm-up run
+  removes that.
+- Noise, from runs that measure the same bin twice under two labels:
+  - Peaks and marks: the medians were within 3% for most cases, and within 10% for the memory
+    that rolldown 1.3 keeps in `issue-11233-optimizer-threads` and `issue-10985-tight-loop`,
+    which depends on which threads did the work. After the idle cleanup of #11655 the two were
+    within 2 MB.
+  - Time: within 3% on a quiet machine. When the load average rose from 2 to 4 to 20, single
+    runs took twice as long, and memory moved by up to 25%.
+  - Running first or second in a round made no difference beyond 3%.
+
+Reading a change: it is the change of the medians. A change marked noise is not a clear
+difference, because the ranges overlap or a side has fewer than 3 rounds. A change without the
+mark can still be chance: one time in ten with 3 rounds, one in 126 with 5. Trust a change that
+is not marked noise and is larger than the noise above. Run a case again with more rounds when it
+matters, like the lobehub peak with sourcemaps, which moves by about 1 GB from run to run
+(`--rounds 9`).
 
 ## Cases (rolldown API)
 
@@ -143,7 +183,8 @@ A file in `projects/` describes a project: `overrides` for pnpm (`latest` means 
 version), optional `install` and `prepare` steps, and `cases`. A case has `args` for node, and optional `cwd`, `env` and `clean`.
 A dev case also has a `script`, which gets `mark(label, { gc })`, `open(path, { wait })` (headless
 Chromium), `crawl(path)` (request every import, like the #11189 repro), `edit(file, text)`
-(undone after the run) and `sleep(ms)`.
+(undone after the run) and `sleep(ms)`. The tables show how many requests the page made and how
+many failed, and how many URLs a crawl found, so a run whose page did not load stands out.
 
 To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set `shallow = true`,
 `ignore = dirty` and `branch` for it in `.gitmodules`.
@@ -152,7 +193,8 @@ To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set 
 
 - `justfile`: the commands
 - `scripts/`: the bench itself. `bench.mjs` is the CLI, `probe.mjs` is loaded into every measured
-  process, `dev.mjs` drives dev servers, `projects.mjs` installs and links the projects.
+  process, `dev.mjs` drives dev servers, `projects.mjs` installs and links the projects,
+  `selftest.mjs` is the child of `just selftest`.
 - `cases/`: the API cases
 - `projects/`: one `<id>.mjs` per project, and the project itself in `projects/<id>/`
 - `.cache/`: inputs, npm installs and tools, made by setup. `results/`: the runs.
@@ -160,7 +202,8 @@ To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set 
 
 ## Notes
 
-- Close other heavy apps while measuring. A busy machine moves the peak by hundreds of MB.
+- Close other heavy apps while measuring, and look at the load in the tables. A busy machine
+  moves the peak by hundreds of MB.
 - Use one checkout per machine. Project `node_modules` are installed in place.
 - Linux with transparent huge pages can grow idle memory again after it was returned
   (khugepaged). `--env MIMALLOC_ALLOW_THP=0` turns it off for a run.
