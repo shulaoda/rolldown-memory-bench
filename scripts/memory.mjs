@@ -57,3 +57,16 @@ export function readProcess(pid) {
   const { mem, peak, rss } = read(pid);
   return { mem: toMB(mem), peak: toMB(peak), rss: toMB(rss) };
 }
+
+// The part of the footprint that mimalloc, rolldown's allocator, holds, in MB. mimalloc tags its
+// memory with VM tag 100, which `footprint` lists as "IOAccelerator". macOS only, about 25 ms.
+export function readMimalloc(pid) {
+  if (process.platform !== 'darwin') return null;
+  try {
+    const out = execFileSync('footprint', ['-p', String(pid), '-f', 'bytes'], { encoding: 'utf8' });
+    const line = out.split('\n').find((text) => /\sIOAccelerator\s*$/.test(text));
+    return line ? toMB(Number(line.trim().split(/\s+/)[0])) : 0;
+  } catch {
+    return null;
+  }
+}

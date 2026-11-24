@@ -143,9 +143,12 @@ export async function runDev({ dir, args, env, log, script }) {
           if (response.status() >= 400) failed++;
         });
         page.on('requestfailed', () => failed++);
+        const loadStart = performance.now();
         await page.goto(new URL(pathname, url).toString(), { waitUntil: 'load', timeout: 300_000 });
+        const loaded = performance.now() - loadStart;
         await page.waitForTimeout(wait);
         await browser.close();
+        metrics['page load'] = { value: Math.round(loaded), unit: 'ms' };
         metrics['page requests'] = { value: requests, unit: 'count' };
         metrics['failed requests'] = { value: failed, unit: 'count' };
       },

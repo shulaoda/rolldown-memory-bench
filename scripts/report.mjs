@@ -30,6 +30,14 @@ function rowsFor(runs) {
       rows.push({ id: 'mark', name: mark.label, label: `${memKind} @ ${mark.label} (MB)`, unit: 'MB', get });
     }
   }
+  for (const run of runs) {
+    for (const mark of run.marks ?? []) {
+      if (mark.mimalloc == null || seen.has(`mi:${mark.label}`)) continue;
+      seen.add(`mi:${mark.label}`);
+      const get = (r) => r.marks?.find((m) => m.label === mark.label)?.mimalloc;
+      rows.push({ id: 'mimalloc', label: `mimalloc @ ${mark.label} (MB)`, unit: 'MB', get });
+    }
+  }
   if (runs.some((r) => r.rustPeak != null)) {
     rows.push({ id: 'rust', label: 'rust heap peak (MB)', unit: 'MB', get: (r) => r.rustPeak });
   }
@@ -180,7 +188,7 @@ export function markdown(record, info = new Map()) {
     '',
     '`just bench` writes this file after every run, and `just report <results.json> ...` writes it again from saved runs.',
     '',
-    `- Machine: ${m.platform} ${m.arch} (${m.release}), ${m.cpu}, ${m.cores} cores, ${m.memGB} GB, Node ${m.node}`,
+    `- Machine: ${m.platform} ${m.arch} (${m.release}), ${m.cpu}, ${m.cores} cores, ${m.memGB} GB, Node ${m.node}${m.thp ? `, transparent huge pages \`${m.thp}\`` : ''}`,
     ...sources.map((s) => `- Run ${s.date.slice(0, 16).replace('T', ' ')} UTC: \`just bench ${s.args.slice(1).join(' ')}\``),
     `- Memory: \`${kind.mem ?? 'rss'}\`, peak: the highest \`${kind.peak ?? 'rss'}\` of the process. Numbers compare only on the same machine.`,
     ...(loads.length ? [`- Load average (1 min) when a run started: ${Math.min(...loads)} to ${Math.max(...loads)}, on ${m.cores} cores`] : []),

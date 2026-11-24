@@ -172,6 +172,7 @@ export async function resolveTarget({ name, spec }, { base: baseSpec } = {}) {
   let pkgDir;
   let kind;
   let git;
+  let repo;
   let headTime;
   const npmTag = spec.match(NPM_SPEC)?.[1];
   const preview = npmTag ? null : await previewOf(spec);
@@ -189,6 +190,7 @@ export async function resolveTarget({ name, spec }, { base: baseSpec } = {}) {
     if (fs.existsSync(path.join(dir, 'packages', 'rolldown', 'package.json'))) {
       pkgDir = path.join(dir, 'packages', 'rolldown');
       kind = 'repo';
+      repo = dir;
       git = gitInfo(dir);
       headTime = Number(exec('git', ['-C', dir, 'log', '-1', '--format=%ct'])) * 1000;
     } else if (readJson(path.join(dir, 'package.json'))?.name === 'rolldown') {
@@ -221,6 +223,7 @@ export async function resolveTarget({ name, spec }, { base: baseSpec } = {}) {
     kind,
     version: pkg.version,
     git,
+    repo,
     pkgDir,
     entry,
     experimentalEntry: exportPath(pkgDir, pkg, './experimental'),

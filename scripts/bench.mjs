@@ -10,7 +10,7 @@ import { setupProject, switchProject } from './projects.mjs';
 import { markdown, mergeRecords, summarize } from './report.mjs';
 import { CHILD, runNode, tail } from './runner.mjs';
 import { parseTarget, resolveTarget, sameFile } from './targets.mjs';
-import { RESULTS, ROOT } from './util.mjs';
+import { RESULTS, ROOT, exec } from './util.mjs';
 
 const HELP = `Usage (\`just bench\` is \`run\`):
   node scripts/bench.mjs list
@@ -140,8 +140,19 @@ function machine() {
     cores: os.availableParallelism(),
     memGB: Math.round(os.totalmem() / 2 ** 30),
     node: process.version,
+    thp: thpSetting(),
     date: new Date().toISOString(),
   };
+}
+
+// By default mimalloc returns memory only in whole 2 MiB ranges when this is not `never`.
+function thpSetting() {
+  if (process.platform !== 'linux') return undefined;
+  try {
+    return fs.readFileSync('/sys/kernel/mm/transparent_hugepage/enabled', 'utf8').match(/\[(\w+)\]/)?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 const safe = (s) => s.replace(/[^\w.-]+/g, '_');
@@ -175,7 +186,39 @@ async function resolveBins() {
     }
     if (b.debug) console.log('  WARNING: this binding is a debug build');
   }
+  const published = bins.filter((b) => b.kind === 'npm' || b.kind === 'preview').length;
+  if (published > 0 && published < bins.length) {
+    console.log(
+      'WARNING: published and local builds are mixed, so the change also includes how they were built. To measure a PR, build both sides locally.',
+    );
+  }
+  compareCommits(bins);
   return bins;
+}
+
+const commits = (n) => `${n} commit${n === 1 ? '' : 's'}`;
+
+// A later repo bin must contain the commit of the first bin. Otherwise its change also includes the
+// commits it lacks.
+function compareCommits([first, ...rest]) {
+  const base = first.git?.replace('+dirty', '');
+  if (!base) return;
+  for (const bin of rest) {
+    if (bin.kind !== 'repo' || !bin.git) continue;
+    let counts;
+    try {
+      counts = exec('git', ['-C', bin.repo, 'rev-list', '--left-right', '--count', `${base}...${bin.git.replace('+dirty', '')}`]);
+    } catch {
+      continue;
+    }
+    const [lacks, has] = counts.split(/\s+/).map(Number);
+    console.log(`${bin.name} has ${commits(has)} that ${first.name} does not have`);
+    if (lacks > 0) {
+      console.log(
+        `  WARNING: ${bin.name} lacks ${commits(lacks)} of ${first.name}, so the change also includes ${lacks === 1 ? 'that commit' : 'those commits'}. Merge the commit of ${first.name} into ${bin.name}, or build ${first.name} from the merge base of the two.`,
+      );
+    }
+  }
 }
 
 // Prepares the input of a case, or installs a project against `bin`.

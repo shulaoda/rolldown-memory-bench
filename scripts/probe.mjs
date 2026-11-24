@@ -3,7 +3,7 @@
 // answers the same report over IPC instead.
 import fs from 'node:fs';
 import { isMainThread } from 'node:worker_threads';
-import { KIND, readProcess, toMB } from './memory.mjs';
+import { KIND, readMimalloc, readProcess, toMB } from './memory.mjs';
 
 const start = performance.now();
 const marks = [];
@@ -16,7 +16,8 @@ export function useNativeStats(fn) {
   nativeStats = typeof fn === 'function' ? fn : null;
 }
 
-// Records the memory now. With `cheap`, Windows skips its slow reader and records the working set.
+// Records the memory now. With `cheap`, it skips the slow readers. Windows then records the working
+// set, and macOS leaves out the mimalloc part.
 export function mark(label, { cheap = false } = {}) {
   const usage = process.memoryUsage();
   const slowOs = process.platform === 'win32' && cheap;
@@ -29,6 +30,8 @@ export function mark(label, { cheap = false } = {}) {
     jsHeap: toMB(usage.heapUsed),
   };
   if (slowOs || os.mem == null) entry.memKind = 'rss';
+  const mimalloc = cheap ? null : readMimalloc(process.pid);
+  if (mimalloc != null) entry.mimalloc = mimalloc;
   const native = nativeStats?.();
   if (native) entry.rustLive = toMB(native.liveBytes);
   marks.push(entry);

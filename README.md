@@ -19,7 +19,7 @@ just list
 just bench --pr 11655                        # the PR's preview against the newest release
 just bench lobehub --pr 11655                # every lobehub case
 just bench --local                           # ../rolldown against the newest release
-just bench --local=../rolldown-wt-11655 --pr 11655
+just bench --bin base=../rolldown-wt-base --bin pr=../rolldown-wt-11655
 just bench issue-11143-api-idle --bin ../rolldown-wt-11655
 just bench lobehub:build-sourcemap --bin a=./a.node --bin b=./b.node --base ../rolldown
 just report results/<run>/results.json       # print a saved run again, and write BENCHMARKS.md from it
@@ -38,9 +38,24 @@ run again later replaces its old numbers. `--out <file>` writes another file ins
 
 ## What to measure: `--pr`, `--local` and `--bin`
 
-The usual comparison is the newest npm release against a PR. With only one of `--pr`, `--local`
-or `--bin`, the bench adds the newest release (`latest`) as the first one, so the tables show the
-change from it.
+To measure what a PR changes, compare two local release builds, the PR and the main commit it is
+based on. Then nothing else differs between them, not even the toolchain.
+
+```sh
+git -C ../rolldown worktree add ../rolldown-wt-base <main commit>
+cd ../rolldown-wt-base && pnpm install && just build-rolldown-release
+just bench --bin base=../rolldown-wt-base --bin pr=../rolldown-wt-11655
+```
+
+Build the PR worktree with `just build-rolldown-release` too. The PR must contain the base commit,
+so to compare against the newest main, merge it into the PR branch first. The bench prints how
+many commits the PR has that the base does not, and warns when the PR lacks commits of the base.
+A run only needs the built `packages/rolldown` of a worktree, so its `target` directory can be
+deleted after the build.
+
+With only one of `--pr`, `--local` or `--bin`, the bench adds the newest release (`latest`) as the
+first one. The change from it includes everything merged since that release. A published build
+also differs from a local one in how it was built, and the bench warns when it mixes the two.
 
 `--pr <number>` uses the pkg.pr.new preview of the PR's head commit, so no machine needs to build
 rolldown. A PR gets a preview only after it has the `trigger: preview` label and the
@@ -95,6 +110,11 @@ Numbers are only comparable on the same machine. Do not compare platforms.
 
 On Windows, reading the commit takes PowerShell about half a second. Marks inside a loop record
 the working set instead, and the table labels them `rss`. The Windows code is not tested yet.
+
+On macOS every mark also records the part that mimalloc, rolldown's allocator, holds, as
+`mimalloc @ <mark>`. The `footprint` tool lists it as `IOAccelerator`, the name macOS gives to the
+tag mimalloc puts on its memory. The rest is mostly the JS heap and Node itself. A read takes about
+25 ms, so marks inside a loop skip it. Other platforms have no such split.
 
 With a binding built with the `tracking_allocator` feature, the tables also show the Rust heap.
 
@@ -188,7 +208,8 @@ version), optional `install` and `prepare` steps, and `cases`. A case has `args`
 A dev case also has a `script`, which gets `mark(label, { gc })`, `open(path, { wait })` (headless
 Chromium), `crawl(path)` (request every import, like the #11189 repro), `edit(file, text)`
 (undone after the run) and `sleep(ms)`. The tables show how many requests the page made and how
-many failed, and how many URLs a crawl found, so a run whose page did not load stands out.
+many failed, and how many URLs a crawl found, so a run whose page did not load stands out. They
+also show how long the page took to load.
 
 To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set `shallow = true`,
 `ignore = dirty` and `branch` for it in `.gitmodules`.
@@ -216,6 +237,9 @@ To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set 
 - Close other heavy apps while measuring, and look at the load in the tables. A busy machine
   moves the peak by hundreds of MB.
 - Use one checkout per machine. Project `node_modules` are installed in place.
+- On Linux the tables show the transparent huge pages setting. By default mimalloc returns memory
+  only in whole 2 MiB ranges when it is not `never`, so runs with different settings do not
+  compare.
 - Linux with transparent huge pages can grow idle memory again after it was returned
   (khugepaged). `--env MIMALLOC_ALLOW_THP=0` turns it off for a run.
 - Linux distributions that Playwright does not know yet need
