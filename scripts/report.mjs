@@ -9,6 +9,9 @@ function format(value, unit) {
 function rowsFor(runs) {
   const kind = runs[0].kind ?? {};
   const rows = [{ id: 'peak', label: `peak ${kind.peak ?? 'memory'} (MB)`, unit: 'MB', get: (r) => r.peak ?? r.maxRss }];
+  if (runs.some((r) => r.peakCommit != null)) {
+    rows.push({ id: 'peakCommit', label: 'peak commit (MB)', unit: 'MB', get: (r) => r.peakCommit });
+  }
   // A case that times its own builds also sleeps, so the process wall time says little there.
   const timed = runs.some((r) => Object.values(r.metrics ?? {}).some((m) => m.unit === 'ms'));
   if (!timed) rows.push({ id: 'wall', label: 'process wall time', unit: 'ms', get: (r) => r.wall });
@@ -30,12 +33,15 @@ function rowsFor(runs) {
       rows.push({ id: 'mark', name: mark.label, label: `${memKind} @ ${mark.label} (MB)`, unit: 'MB', get });
     }
   }
-  for (const run of runs) {
-    for (const mark of run.marks ?? []) {
-      if (mark.mimalloc == null || seen.has(`mi:${mark.label}`)) continue;
-      seen.add(`mi:${mark.label}`);
-      const get = (r) => r.marks?.find((m) => m.label === mark.label)?.mimalloc;
-      rows.push({ id: 'mimalloc', label: `mimalloc @ ${mark.label} (MB)`, unit: 'MB', get });
+  // Extra values of a mark: mimalloc on macOS, commit on Windows.
+  for (const field of ['mimalloc', 'commit']) {
+    for (const run of runs) {
+      for (const mark of run.marks ?? []) {
+        if (mark[field] == null || seen.has(`${field}:${mark.label}`)) continue;
+        seen.add(`${field}:${mark.label}`);
+        const get = (r) => r.marks?.find((m) => m.label === mark.label)?.[field];
+        rows.push({ id: field, label: `${field} @ ${mark.label} (MB)`, unit: 'MB', get });
+      }
     }
   }
   if (runs.some((r) => r.rustPeak != null)) {

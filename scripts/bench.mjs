@@ -299,7 +299,7 @@ async function run(names) {
           }
           const result = await runOne(job, variant, bin, input, { log, env });
           checkBinding(name, bin, result);
-          const { marks = [], metrics = {}, peak, maxRss, cpu, rustPeak, kind, bindings } = result.report ?? {};
+          const { marks = [], metrics = {}, peak, maxRss, cpu, peakCommit, rustPeak, kind, bindings } = result.report ?? {};
           record.runs.push({
             case: job.id,
             variant,
@@ -313,6 +313,7 @@ async function run(names) {
             peak,
             maxRss,
             cpu,
+            peakCommit,
             rustPeak,
             bindings,
             marks,

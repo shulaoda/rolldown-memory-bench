@@ -109,12 +109,18 @@ Numbers are only comparable on the same machine. Do not compare platforms.
 | Windows | private working set (Task Manager "Memory") | `PeakWorkingSetSize` |
 
 On Windows a small helper reads them with `GetProcessMemoryInfo`. Setup builds it with the
-`csc.exe` of the .NET Framework 4, which every Windows has. Private bytes (commit) is not used: V8
-keeps freed heap pages committed, and after the selftest freed its 512 MiB the commit stayed
-134 MB above the start while the private working set went back. Windows keeps no peak of the
+`csc.exe` of the .NET Framework 4, which every Windows has. Private bytes (commit) is not the
+main number. V8 keeps freed heap pages committed, and after the selftest freed its 512 MiB the
+commit stayed 134 MB above the start while the private working set went back. Windows keeps no peak of the
 private working set, so the peak is the peak working set, which also counts shared pages, like
 `VmHWM` on Linux. A read takes about 40 ms, so marks inside a loop record the working set
 instead, and the table labels them `rss`.
+
+Windows also records the commit, as `commit @ <mark>` for every mark outside a loop and as the
+peak commit. Commit is memory promised to the process, used or not. It counts against the commit
+limit of Windows (RAM plus the page file), and a process that reaches the limit fails to allocate
+even with free RAM. A change to how rolldown commits memory shows there, and not in the working
+set.
 
 On macOS every mark also records the part that mimalloc, rolldown's allocator, holds, as
 `mimalloc @ <mark>`. The `footprint` tool lists it as `IOAccelerator`, the name macOS gives to the

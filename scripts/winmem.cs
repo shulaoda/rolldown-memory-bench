@@ -1,5 +1,6 @@
-// Prints the private working set, the peak working set and the private bytes (commit) of a
-// process, in bytes. The private working set is the number Task Manager shows as "Memory".
+// Prints the private working set, the peak working set, the private bytes (commit) and the peak
+// commit of a process, in bytes. The private working set is the number Task Manager shows as
+// "Memory".
 // Built with the csc.exe of the .NET Framework, which every Windows has.
 using System;
 using System.Runtime.InteropServices;
@@ -43,7 +44,7 @@ static class WinMem {
       Counters c = new Counters();
       c.cb = (uint)Marshal.SizeOf(typeof(Counters));
       if (!K32GetProcessMemoryInfo(process, ref c, c.cb)) return 1;
-      Console.WriteLine("{0} {1} {2}", c.PrivateWorkingSetSize, c.PeakWorkingSetSize, c.PrivateUsage);
+      Console.WriteLine("{0} {1} {2} {3}", c.PrivateWorkingSetSize, c.PeakWorkingSetSize, c.PrivateUsage, c.PeakPagefileUsage);
       return 0;
     } finally {
       CloseHandle(process);

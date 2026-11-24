@@ -30,6 +30,7 @@ export function mark(label, { cheap = false } = {}) {
     jsHeap: toMB(usage.heapUsed),
   };
   if (slowOs || os.mem == null) entry.memKind = 'rss';
+  if (os.commit != null) entry.commit = os.commit;
   const mimalloc = cheap ? null : readMimalloc(process.pid);
   if (mimalloc != null) entry.mimalloc = mimalloc;
   const native = nativeStats?.();
@@ -64,6 +65,7 @@ function report(code) {
     peak: os.peak ?? null,
     maxRss: toMB(usage.maxRSS * 1024),
     cpu: Math.round((usage.userCPUTime + usage.systemCPUTime) / 1000),
+    peakCommit: os.peakCommit ?? undefined,
     rustPeak: native ? toMB(native.peakBytes) : undefined,
     bindings: loadedBindings(),
     marks,

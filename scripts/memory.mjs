@@ -57,8 +57,8 @@ function linux(pid) {
 // A read takes about 40 ms.
 function win32(pid) {
   const out = execFileSync(WINMEM, [String(pid)], { encoding: 'utf8' });
-  const [mem, peak, commit] = out.trim().split(' ').map(Number);
-  return { mem, peak, commit };
+  const [mem, peak, commit, peakCommit] = out.trim().split(' ').map(Number);
+  return { mem, peak, commit, peakCommit };
 }
 
 const readers = { darwin, linux, win32 };
@@ -67,8 +67,8 @@ const readers = { darwin, linux, win32 };
 export function readProcess(pid) {
   const read = readers[process.platform];
   if (!read) return { mem: null, peak: null };
-  const { mem, peak, rss } = read(pid);
-  return { mem: toMB(mem), peak: toMB(peak), rss: toMB(rss) };
+  const { mem, peak, rss, commit, peakCommit } = read(pid);
+  return { mem: toMB(mem), peak: toMB(peak), rss: toMB(rss), commit: toMB(commit), peakCommit: toMB(peakCommit) };
 }
 
 // The part of the footprint that mimalloc, rolldown's allocator, holds, in MB. mimalloc tags its
