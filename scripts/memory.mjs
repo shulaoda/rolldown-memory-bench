@@ -10,20 +10,32 @@ export const toMB = (bytes) => (Number.isFinite(bytes) ? Math.round((bytes / MB)
 export const KIND = {
   darwin: { mem: 'phys_footprint', peak: 'phys_footprint' },
   linux: { mem: 'RssAnon', peak: 'VmHWM' },
-  win32: { mem: 'private bytes', peak: 'commit' },
+  win32: { mem: 'private working set', peak: 'PeakWorkingSet' },
 }[process.platform] ?? { mem: 'rss', peak: 'rss' };
 
 const FOOTPRINT = path.join(PLATFORM_CACHE, 'tools', 'footprint');
+const WINMEM = path.join(PLATFORM_CACHE, 'tools', 'winmem.exe');
+const CSC = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
 
-// Builds the macOS helper. Call it in the parent, before any child needs it.
-export function prepareTools() {
-  if (process.platform !== 'darwin' || fs.existsSync(FOOTPRINT)) return;
-  fs.mkdirSync(path.dirname(FOOTPRINT), { recursive: true });
-  const result = spawnSync('cc', ['-O2', '-o', FOOTPRINT, path.join(ROOT, 'scripts', 'footprint.c')], {
-    encoding: 'utf8',
-  });
+function build(cmd, args, out, hint) {
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const result = spawnSync(cmd, args, { encoding: 'utf8' });
   if (result.status !== 0) {
-    throw new Error(`Building the footprint helper failed. Install the Xcode command line tools.\n${result.stderr}`);
+    throw new Error(`Building ${path.basename(out)} failed. ${hint}\n${result.error?.message ?? ''}${result.stdout ?? ''}${result.stderr ?? ''}`);
+  }
+}
+
+// Builds the helper that reads the memory on macOS and Windows. Call it in the parent, before any
+// child needs it.
+export function prepareTools() {
+  if (process.platform === 'darwin' && !fs.existsSync(FOOTPRINT)) {
+    const source = path.join(ROOT, 'scripts', 'footprint.c');
+    build('cc', ['-O2', '-o', FOOTPRINT, source], FOOTPRINT, 'Install the Xcode command line tools.');
+  }
+  const source = path.join(ROOT, 'scripts', 'winmem.cs');
+  const stale = () => fs.statSync(WINMEM).mtimeMs < fs.statSync(source).mtimeMs;
+  if (process.platform === 'win32' && (!fs.existsSync(WINMEM) || stale())) {
+    build(CSC, ['-nologo', '-optimize', `-out:${WINMEM}`, source], WINMEM, `It needs ${CSC}, the C# compiler of the .NET Framework 4.`);
   }
 }
 
@@ -38,14 +50,15 @@ function linux(pid) {
   return { mem: kB('RssAnon'), peak: kB('VmHWM'), rss: kB('VmRSS') };
 }
 
-// PeakPagedMemorySize64 is PeakPagefileUsage, the peak commit charge. It takes about half a second.
+// The private working set, like macOS footprint and Linux RssAnon. Private bytes (commit) is not
+// used: V8 keeps freed heap pages committed after it discards them, so the commit stayed 134 MB
+// above the start after the selftest freed everything. Windows keeps no peak of the private working
+// set, so the peak is the peak working set, which also counts shared pages, like Linux VmHWM.
+// A read takes about 40 ms.
 function win32(pid) {
-  const script = `$p = Get-Process -Id ${pid}; "$($p.PrivateMemorySize64) $($p.PeakPagedMemorySize64) $($p.WorkingSet64)"`;
-  const out = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
-    encoding: 'utf8',
-  });
-  const [mem, peak, rss] = out.trim().split(/\s+/).map(Number);
-  return { mem, peak, rss };
+  const out = execFileSync(WINMEM, [String(pid)], { encoding: 'utf8' });
+  const [mem, peak, commit] = out.trim().split(' ').map(Number);
+  return { mem, peak, commit };
 }
 
 const readers = { darwin, linux, win32 };

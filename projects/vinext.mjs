@@ -34,8 +34,10 @@ export default {
     replace('pnpm-workspace.yaml', /^minimumReleaseAge: \d+$/m, 'minimumReleaseAge: 0');
     run('pnpm', ['install', '--no-frozen-lockfile', '--ignore-scripts', ...filters]);
   },
-  prepare({ run }) {
-    run('node', ['benchmarks/generate-app.mjs']);
+  // The script finds the repo from `new URL(import.meta.url).pathname`, which is `/E:/...` on
+  // Windows, so it is given the repo.
+  prepare({ run, dir }) {
+    run('node', ['benchmarks/generate-app.mjs'], { env: { VINEXT_PERF_TARGET_ROOT: dir } });
   },
   cases: {
     // The 33-route app of vinext's own benchmarks.

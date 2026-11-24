@@ -126,8 +126,9 @@ export async function setupProject(id, project, target) {
   if (isSubmodule(dir)) exec('git', ['-C', dir, 'checkout', '-q', '-f', 'HEAD']);
   if (overrides) setPnpmOverrides(dir, overrides);
   const ctx = {
+    dir,
     latest,
-    run: (cmd, args) => exec(cmd, args, { cwd: dir, inherit: true }),
+    run: (cmd, args, { env } = {}) => exec(cmd, args, { cwd: dir, env, inherit: true }),
     replace(file, from, to) {
       const full = path.join(dir, file);
       const text = fs.readFileSync(full, 'utf8');

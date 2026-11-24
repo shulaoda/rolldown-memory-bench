@@ -106,10 +106,15 @@ Numbers are only comparable on the same machine. Do not compare platforms.
 | --- | --- | --- |
 | macOS | `phys_footprint` (Activity Monitor "Memory") | lifetime max `phys_footprint` |
 | Linux | `RssAnon` from `/proc/<pid>/status` | `VmHWM` |
-| Windows | private bytes (commit) | peak commit (`PeakPagedMemorySize64`) |
+| Windows | private working set (Task Manager "Memory") | `PeakWorkingSetSize` |
 
-On Windows, reading the commit takes PowerShell about half a second. Marks inside a loop record
-the working set instead, and the table labels them `rss`. The Windows code is not tested yet.
+On Windows a small helper reads them with `GetProcessMemoryInfo`. Setup builds it with the
+`csc.exe` of the .NET Framework 4, which every Windows has. Private bytes (commit) is not used: V8
+keeps freed heap pages committed, and after the selftest freed its 512 MiB the commit stayed
+134 MB above the start while the private working set went back. Windows keeps no peak of the
+private working set, so the peak is the peak working set, which also counts shared pages, like
+`VmHWM` on Linux. A read takes about 40 ms, so marks inside a loop record the working set
+instead, and the table labels them `rss`.
 
 On macOS every mark also records the part that mimalloc, rolldown's allocator, holds, as
 `mimalloc @ <mark>`. The `footprint` tool lists it as `IOAccelerator`, the name macOS gives to the
