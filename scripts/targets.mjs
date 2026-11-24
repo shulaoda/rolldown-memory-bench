@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { PLATFORM_CACHE, cached, exec, linkDir, readJson } from './util.mjs';
+import { PLATFORM_CACHE, cached, exec, findPackage, linkDir, readJson } from './util.mjs';
 
 // `name=spec` or `spec`. A spec is an npm version (`1.3.3`, `latest`), a pkg.pr.new preview
 // (`pr:11655`, `main`, `commit:<sha>`), a rolldown repo or worktree, a built `rolldown` package
@@ -153,14 +153,6 @@ async function overlay(nodeFile, base) {
   return pkgDir;
 }
 
-// Whether Node finds `name` from `dir`, which looks in every node_modules up the tree.
-function hasPackage(dir, name) {
-  for (let current = dir; ; current = path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'node_modules', name, 'package.json'))) return true;
-    if (path.dirname(current) === current) return false;
-  }
-}
-
 export async function resolveTarget({ name, spec }, { base: baseSpec } = {}) {
   if (spec.endsWith('.node')) {
     const nodeFile = fs.realpathSync(path.resolve(spec));
@@ -213,7 +205,7 @@ export async function resolveTarget({ name, spec }, { base: baseSpec } = {}) {
     throw new Error(`${pkgDir} is not built. Run \`just build-rolldown-release\` in the repo first.`);
   }
   if (kind === 'repo' || kind === 'package') {
-    const missing = Object.keys(pkg.dependencies ?? {}).filter((dep) => !hasPackage(pkgDir, dep));
+    const missing = Object.keys(pkg.dependencies ?? {}).filter((dep) => !findPackage(pkgDir, dep));
     if (missing.length) throw new Error(`${pkgDir} cannot load ${missing.join(', ')}. Run \`pnpm install\` in its repo.`);
   }
   const binding = findBinding(pkgDir);

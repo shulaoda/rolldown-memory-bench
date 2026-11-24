@@ -109,12 +109,14 @@ wall time, which includes Node startup and loading the vite config.
 
 Checked on an M4 Pro and on an arm64 Linux VM on 2026-11-23.
 
-- The reader. `just selftest` allocates 512 MiB in a child, frees it, and checks what the reader
-  saw. It passes on macOS and Linux. On macOS the helper reads the same as `vmmap` and
-  `footprint`. Run it once on every new machine, Windows above all.
+- The reader. `just selftest` allocates 512 MiB of JS arrays in a child, frees them, and checks
+  what the reader saw. On macOS the helper reads the same as `vmmap` and `footprint`. Run it once
+  on every new machine, Windows above all.
 - Garbage collection. The `gc()` of the API cases collects every output object (checked with
-  `WeakRef`), so the idle marks are not held up by JS. Buffers that JS frees go back to the OS a
-  few seconds after the GC.
+  `WeakRef`), so the idle marks are not held up by JS. Memory of the JS heap goes back to the OS
+  right after the GC. Large Buffers go back to malloc, and on macOS 27 malloc kept freed blocks of
+  128 MiB in its cache, where they still count in the footprint (`vmmap` shows them as
+  "Malloc Large (empty)"). That is why the selftest uses JS arrays and not Buffers.
 - The first run of a case read its files from disk and took up to 50% longer. The warm-up run
   removes that.
 - Noise, from runs that measure the same bin twice under two labels:
@@ -194,9 +196,16 @@ To add a submodule: `git submodule add --depth 1 <url> projects/<id>`, then set 
 ## Layout
 
 - `justfile`: the commands
-- `scripts/`: the bench itself. `bench.mjs` is the CLI, `probe.mjs` is loaded into every measured
-  process, `dev.mjs` drives dev servers, `projects.mjs` installs and links the projects,
-  `selftest.mjs` is the child of `just selftest`.
+- `scripts/`: the bench itself.
+  - `bench.mjs`: the CLI. It picks the cases and bins, runs the rounds and saves the results.
+  - `targets.mjs`: turns a `--bin` spec into a rolldown package and its binding.
+  - `runner.mjs`: starts every measured process with `probe.mjs` in it, and writes its output to
+    the log.
+  - `probe.mjs` and `memory.mjs`: read the memory of the process, and report the marks and the peak.
+  - `child.mjs`: runs one API case. `dev.mjs`: drives a dev server and the browser.
+  - `projects.mjs`: installs the projects and points them at a bin. `inputs.mjs`: makes the inputs
+    of the API cases.
+  - `report.mjs`: the tables. `selftest.mjs`: the child of `just selftest`.
 - `cases/`: the API cases
 - `projects/`: one `<id>.mjs` per project, and the project itself in `projects/<id>/`
 - `.cache/`: inputs, npm installs and tools, made by setup. `results/`: the runs.

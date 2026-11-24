@@ -1,8 +1,4 @@
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
+import { median } from './util.mjs';
 
 function format(value, unit) {
   if (unit === 'count') return String(Math.round(value));

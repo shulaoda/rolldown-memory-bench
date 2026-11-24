@@ -71,3 +71,18 @@ export function listFiles(dir, filter = () => true, out = []) {
 }
 
 export const toPosix = (file) => file.replaceAll('\\', '/');
+
+// The first `node_modules/<name>` from `dir` upward, the way Node looks for a package.
+export function findPackage(dir, name) {
+  for (let current = dir; ; current = path.dirname(current)) {
+    const candidate = path.join(current, 'node_modules', name);
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    if (path.dirname(current) === current) return undefined;
+  }
+}
+
+export function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}

@@ -13,8 +13,7 @@ export const meta = {
 
 export const setup = () => three10x();
 
-export async function run({ rolldown, experimental, variant, input, mark, time, gc, sleep }) {
-  experimental.resetNativeMemoryStats?.();
+export async function run({ rolldown, variant, input, mark, time, gc, sleep }) {
   let outputs = [];
   await time('all builds', async () => {
     for (let i = 1; i <= variant.builds; i++) {

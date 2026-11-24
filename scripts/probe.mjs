@@ -68,7 +68,9 @@ function report(code) {
   };
 }
 
-async function fullGc() {
+// Two full GCs with a turn of the event loop after each, so objects that wait for one turn, such as
+// WeakRef targets, are collected too. Without `--expose-gc` it does nothing.
+export async function fullGc() {
   for (let i = 0; i < 2; i++) {
     globalThis.gc?.();
     await new Promise((resolve) => setImmediate(resolve));

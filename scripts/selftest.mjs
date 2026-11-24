@@ -6,11 +6,14 @@ import { sleep } from './util.mjs';
 
 const MiB = 2 ** 20;
 const start = mark('start');
-// Separate large buffers are mapped on their own, so freeing them returns the memory.
-let buffers = Array.from({ length: 4 }, () => Buffer.alloc(128 * MiB, 1));
+// Arrays of doubles live in the JS heap. V8 maps each large one on its own and unmaps it after the
+// GC. Large Buffers would test malloc instead: macOS malloc keeps freed large blocks in its cache,
+// where they still count in the footprint.
+let arrays = Array.from({ length: 4 }, () => new Array(16 * MiB).fill(1.5));
+// `fill` leaves the first backing store of each array behind. A GC frees it before the mark.
+globalThis.gc();
 mark('512 MiB allocated');
-buffers = null;
-// Node releases freed buffers some seconds after the GC.
+arrays = null;
 const end = Date.now() + 30_000;
 while (Date.now() < end) {
   globalThis.gc();

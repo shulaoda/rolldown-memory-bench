@@ -78,6 +78,22 @@ const { values, positionals } = parseArgs({
 // The markdown file a run or `report` writes, relative to the bench root.
 const outFile = () => path.resolve(ROOT, values.out ?? 'BENCHMARKS.md');
 
+function parseRounds(text) {
+  if (text === undefined) return undefined;
+  const rounds = Number(text);
+  if (!Number.isInteger(rounds) || rounds < 1) throw new Error(`--rounds takes a whole number of 1 or more, not "${text}"`);
+  return rounds;
+}
+
+function parseEnv(list = []) {
+  const pairs = list.map((kv) => {
+    const eq = kv.indexOf('=');
+    if (eq < 1) throw new Error(`--env takes K=V, not "${kv}"`);
+    return [kv.slice(0, eq), kv.slice(eq + 1)];
+  });
+  return Object.fromEntries(pairs);
+}
+
 async function loadDefinitions() {
   const load = async (dir, pick) => {
     const map = new Map();
@@ -128,20 +144,19 @@ function machine() {
   };
 }
 
-const parseEnv = (list = []) =>
-  Object.fromEntries(list.map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]));
 const safe = (s) => s.replace(/[^\w.-]+/g, '_');
 
-async function resolveBins({ baseline }) {
+// The bins to compare. With only one, the newest npm release comes first as the baseline.
+async function resolveBins() {
   const specs = [
-    ...(values.pr ?? []).map((n) => `pr-${n}=pr:${n}`),
+    ...(values.pr ?? []).map((n) => `pr:${n}`),
     ...localPaths.map((dir, i) => `${i ? `local-${i + 1}` : 'local'}=${dir}`),
     ...(values.bin ?? []),
   ];
   if (specs.length === 0) throw new Error('Pass what to measure with --pr, --local or --bin. See --help.');
   const bins = [];
   for (const arg of specs) bins.push(await resolveTarget(parseTarget(arg), { base: values.base }));
-  if (baseline && bins.length === 1) {
+  if (bins.length === 1) {
     const latest = await resolveTarget({ name: null, spec: 'latest' });
     if (latest.pkgDir !== bins[0].pkgDir) bins.unshift(latest);
   }
@@ -163,66 +178,85 @@ async function resolveBins({ baseline }) {
   return bins;
 }
 
+// Prepares the input of a case, or installs a project against `bin`.
 async function setup(job, bin) {
   if (job.kind === 'case') return (await job.mod.setup?.()) ?? null;
   await setupProject(job.id, job.project, bin);
   return null;
 }
 
-async function runOne(job, variant, bin, input, { log, probeDir, env }) {
+async function setupAll(names) {
+  const jobs = select(names.length ? names : ['all'], await loadDefinitions());
+  // Projects need some rolldown to install against. The bench re-points it before every run.
+  const needsBin = jobs.some((job) => job.kind === 'project');
+  const bin = needsBin ? await resolveTarget({ name: null, spec: 'latest' }) : undefined;
+  prepareTools();
+  for (const job of jobs) await setup(job, bin);
+  console.log('Setup done.');
+}
+
+// One measured run in a fresh process. `env` is the `--env` of the command line.
+async function runOne(job, variant, bin, input, { log, env }) {
   if (job.kind === 'case') {
     const jobEnv = { BENCH_JOB: JSON.stringify({ caseFile: job.file, variant, target: bin, input }) };
     const variantEnv = job.variants[variant].env;
-    return runNode({ args: ['--expose-gc', CHILD], env: { ...variantEnv, ...env, ...jobEnv }, log, probeDir });
+    return runNode({ args: ['--expose-gc', CHILD], env: { ...variantEnv, ...env, ...jobEnv }, log });
   }
   const projectCase = job.project.cases[variant];
-  const cwd = switchProject(job.id, job.project, projectCase, bin);
-  const caseEnv = { ...job.project.env, ...projectCase.env, ...env };
+  const cwd = switchProject(job.id, projectCase, bin);
+  const caseEnv = { ...projectCase.env, ...env };
   if (projectCase.script) {
     return runDev({ dir: cwd, args: projectCase.args, env: caseEnv, log, script: projectCase.script });
   }
-  return runNode({ args: projectCase.args, cwd, env: caseEnv, log, probeDir });
+  return runNode({ args: projectCase.args, cwd, env: caseEnv, log });
+}
+
+// A run must load the binding of its bin and no other one, or the numbers belong to another build.
+function checkBinding(name, bin, result) {
+  const loaded = result.report?.bindings ?? [];
+  const wrong = loaded.filter((file) => !sameFile(file, bin.binding));
+  if (wrong.length || (result.ok && loaded.length === 0)) {
+    throw new Error(`${name} with ${bin.name} loaded ${loaded.join(', ') || 'no rolldown binding'}, not ${bin.binding}`);
+  }
 }
 
 async function run(names) {
+  const roundsOption = parseRounds(values.rounds);
+  const env = parseEnv(values.env);
   const defs = await loadDefinitions();
   const jobs = select(names, defs);
-  const bins = await resolveBins({ baseline: true });
+  const bins = await resolveBins();
   prepareTools();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const runDir = path.join(RESULTS, `${stamp}-${process.platform}-${process.arch}`);
   fs.mkdirSync(path.join(runDir, 'logs'), { recursive: true });
   const record = { machine: machine(), args: process.argv.slice(2), targets: bins, runs: [] };
   const save = () => fs.writeFileSync(path.join(runDir, 'results.json'), `${JSON.stringify(record, null, 2)}\n`);
-  const env = parseEnv(values.env);
   console.log(`memory metric: ${KIND.mem}, peak metric: ${KIND.peak}`);
 
   for (const job of jobs) {
     const input = await setup(job, bins[0]);
-    const rounds = Number(values.rounds ?? job.meta.rounds ?? 3);
+    const rounds = roundsOption ?? job.meta.rounds ?? 3;
     // The first run of a case reads its files from disk, and it was up to 50% slower.
     if (!values['no-warmup']) {
       const variant = job.selected[0];
       const log = path.join(runDir, 'logs', safe(`${job.id}:${variant}-warmup.log`));
-      const result = await runOne(job, variant, bins[0], input, { log, probeDir: path.join(runDir, 'probe'), env });
+      const result = await runOne(job, variant, bins[0], input, { log, env });
       console.log(`[warmup] ${job.id}:${variant}  ${bins[0].name}  ${result.ok ? 'done, numbers dropped' : `FAILED, log ${log}`}`);
     }
     for (const variant of job.selected) {
+      const name = `${job.id}:${variant}`;
       for (let round = 0; round < rounds; round++) {
         for (const bin of round % 2 ? [...bins].reverse() : bins) {
-          const name = `${job.id}:${variant}`;
           const log = path.join(runDir, 'logs', safe(`${name}-${bin.name}-${round + 1}.log`));
-          const probeDir = path.join(runDir, 'probe');
           // Other work on the machine moves the numbers, so the record keeps how busy it was.
           const load = Math.round(os.loadavg()[0] * 10) / 10;
           if (load > os.availableParallelism() / 4) {
             console.log(`  WARNING: the machine is busy (load ${load} on ${os.availableParallelism()} cores), so numbers move more`);
           }
-          const result = await runOne(job, variant, bin, input, { log, probeDir, env });
-          const report = result.report ?? {};
-          const wrong = (report.bindings ?? []).filter((file) => !sameFile(file, bin.binding));
-          if (wrong.length) throw new Error(`${name} with ${bin.name} loaded ${wrong.join(', ')}, not ${bin.binding}`);
-          const { marks = [], metrics = {}, peak, maxRss, cpu, rustPeak, kind, bindings } = report;
+          const result = await runOne(job, variant, bin, input, { log, env });
+          checkBinding(name, bin, result);
+          const { marks = [], metrics = {}, peak, maxRss, cpu, rustPeak, kind, bindings } = result.report ?? {};
           record.runs.push({
             case: job.id,
             variant,
@@ -263,7 +297,7 @@ async function selftest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-selftest-'));
   const log = path.join(dir, 'selftest.log');
   const child = path.join(ROOT, 'scripts', 'selftest.mjs');
-  const result = await runNode({ args: ['--expose-gc', child], env: {}, log, probeDir: path.join(dir, 'probe') });
+  const result = await runNode({ args: ['--expose-gc', child], env: {}, log });
   if (!result.ok) throw new Error(`The selftest process failed:\n${tail(log)}`);
   const { marks, peak } = result.report;
   const [start, allocated, freed] = marks.map((mark) => mark.mem);
@@ -279,6 +313,17 @@ async function selftest() {
     if (!pass(mb)) process.exitCode = 1;
   }
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// Prints saved runs again and writes the markdown file from them. Several runs of the same bins
+// are merged, and a case in a later run replaces the same case in an earlier one.
+async function report(files) {
+  if (files.length === 0) throw new Error('Pass one or more results.json files.');
+  const records = files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
+  const record = records.length > 1 ? mergeRecords(records) : records[0];
+  console.log(summarize(record));
+  fs.writeFileSync(outFile(), markdown(record, caseInfo(await loadDefinitions())));
+  console.log(`\nWrote ${outFile()}`);
 }
 
 async function list() {
@@ -303,22 +348,9 @@ try {
   else if (command === 'list') await list();
   else if (command === 'run') await run(names);
   else if (command === 'selftest') await selftest();
-  else if (command === 'setup') {
-    const jobs = select(names.length ? names : ['all'], await loadDefinitions());
-    // Projects need some rolldown to install against. The bench re-points it before every run.
-    const needsBin = jobs.some((job) => job.kind === 'project');
-    const bin = needsBin ? await resolveTarget({ name: null, spec: 'latest' }) : undefined;
-    prepareTools();
-    for (const job of jobs) await setup(job, bin);
-    console.log('Setup done.');
-  } else if (command === 'report') {
-    if (names.length === 0) throw new Error('Pass one or more results.json files.');
-    const records = names.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
-    const record = records.length > 1 ? mergeRecords(records) : records[0];
-    console.log(summarize(record));
-    fs.writeFileSync(outFile(), markdown(record, caseInfo(await loadDefinitions())));
-    console.log(`\nWrote ${outFile()}`);
-  } else throw new Error(`Unknown command "${command}"\n\n${HELP}`);
+  else if (command === 'setup') await setupAll(names);
+  else if (command === 'report') await report(names);
+  else throw new Error(`Unknown command "${command}"\n\n${HELP}`);
 } catch (error) {
   console.error(`error: ${error.message}`);
   process.exitCode = 1;

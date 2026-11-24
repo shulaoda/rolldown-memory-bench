@@ -1,13 +1,13 @@
 // Runs a dev server with the probe, drives it with a case script, and asks the probe for marks
 // and the final report over IPC.
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { ROOT, sleep } from './util.mjs';
+import { startNode } from './runner.mjs';
+import { sleep } from './util.mjs';
 
-const PROBE = pathToFileURL(path.join(ROOT, 'scripts', 'probe.mjs')).href;
+const READY_TIMEOUT = 180_000;
+const ANSWER_TIMEOUT = 120_000;
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -59,8 +59,8 @@ async function launchBrowser() {
   return playwright.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-gpu'] });
 }
 
-async function waitReady(url, child, timeout) {
-  const end = Date.now() + timeout;
+async function waitReady(url, child) {
+  const end = Date.now() + READY_TIMEOUT;
   while (Date.now() < end) {
     if (child.exitCode !== null || child.signalCode !== null) throw new Error('the dev server exited before it was ready');
     const ok = await fetch(url).then(
@@ -70,7 +70,7 @@ async function waitReady(url, child, timeout) {
     if (ok) return;
     await sleep(500);
   }
-  throw new Error(`the dev server was not ready after ${timeout / 1000}s`);
+  throw new Error(`the dev server was not ready after ${READY_TIMEOUT / 1000}s`);
 }
 
 async function stop(child) {
@@ -82,47 +82,50 @@ async function stop(child) {
   clearTimeout(timer);
 }
 
-export async function runDev({ dir, args, env, log, script, readyTimeout = 180_000 }) {
+let lastId = 0;
+
+// Asks the probe in the server for a mark or the report. It fails when the server is gone or does
+// not answer in time.
+function ask(child, message) {
+  return new Promise((resolve, reject) => {
+    const id = ++lastId;
+    const onMessage = (answer) => answer?.type === 'bench' && answer.id === id && done(null, answer.data);
+    const onExit = () => done(new Error('the dev server exited'));
+    const timer = setTimeout(() => done(new Error('the probe did not answer')), ANSWER_TIMEOUT);
+    function done(error, data) {
+      clearTimeout(timer);
+      child.off('message', onMessage).off('exit', onExit);
+      if (error) reject(error);
+      else resolve(data);
+    }
+    child.on('message', onMessage).on('exit', onExit);
+    // With a callback, a closed channel fails this call instead of crashing the bench.
+    child.send({ type: 'bench', id, ...message }, (error) => error && done(error));
+  });
+}
+
+export async function runDev({ dir, args, env, log, script }) {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}/`;
-  const serverArgs = [`--import=${PROBE}`, ...args, '--host', '127.0.0.1', '--port', String(port), '--strictPort'];
   const start = performance.now();
-  const child = spawn(process.execPath, serverArgs, {
+  const child = startNode({
+    args: [...args, '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
     cwd: dir,
-    env: { ...process.env, ...env, BENCH_PROBE_IPC: '1' },
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    env: { ...env, BENCH_PROBE_IPC: '1' },
+    log,
+    ipc: true,
   });
-  const logStream = fs.createWriteStream(log);
-  child.stdout.pipe(logStream, { end: false });
-  child.stderr.pipe(logStream, { end: false });
-
-  const pending = new Map();
-  let nextId = 0;
-  child.on('message', (message) => {
-    if (message?.type !== 'bench') return;
-    pending.get(message.id)?.(message.data);
-    pending.delete(message.id);
-  });
-  const ask = (message) =>
-    new Promise((resolve, reject) => {
-      const id = ++nextId;
-      pending.set(id, resolve);
-      child.send({ type: 'bench', id, ...message });
-      setTimeout(() => pending.delete(id) && reject(new Error('the probe did not answer')), 120_000);
-    });
 
   const edited = new Map();
   const browsers = [];
   const metrics = {};
   try {
-    await waitReady(url, child, readyTimeout);
+    await waitReady(url, child);
     metrics.ready = { value: Math.round(performance.now() - start), unit: 'ms' };
     await script({
-      url,
-      dir,
       sleep,
       // `gc` runs a full GC in the server first. The server needs `--expose-gc` for that.
-      mark: (label, { gc = false } = {}) => ask({ action: 'mark', label, gc }),
+      mark: (label, { gc = false } = {}) => ask(child, { action: 'mark', label, gc }),
       // The counts show a run whose page or crawl did not load like the others.
       async crawl(pathname = '/') {
         const urls = await crawl(new URL(pathname, url).toString());
@@ -152,16 +155,15 @@ export async function runDev({ dir, args, env, log, script, readyTimeout = 180_0
         fs.appendFileSync(full, text);
       },
     });
-    const report = await ask({ action: 'report' });
+    const report = await ask(child, { action: 'report' });
     report.metrics = { ...metrics, ...report.metrics };
     return { ok: true, wall: Math.round(performance.now() - start), report };
   } catch (error) {
-    logStream.write(`\n[bench] ${error.stack}\n`);
+    fs.appendFileSync(log, `\n[bench] ${error.stack}\n`);
     return { ok: false, code: child.exitCode, signal: child.signalCode, wall: Math.round(performance.now() - start), report: null };
   } finally {
     for (const [file, text] of edited) fs.writeFileSync(file, text);
     for (const browser of browsers) await browser.close().catch(() => {});
     await stop(child);
-    logStream.end();
   }
 }

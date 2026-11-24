@@ -4,16 +4,16 @@
 // every target, and it does not depend on how a pnpm version handles `link:` overrides.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PLATFORM_CACHE, ROOT, exec, isWin, linkDir, readJson } from './util.mjs';
+import { PLATFORM_CACHE, ROOT, exec, findPackage, linkDir, readJson, toPosix } from './util.mjs';
 
 const RECORD = '.bench-relinked.json';
 const MARKER = '.bench-ready';
 
-export const projectDir = (id, project) => path.join(ROOT, 'projects', project.dir ?? id);
+const projectDir = (id) => path.join(ROOT, 'projects', id);
 const slotPath = (id) => path.join(PLATFORM_CACHE, 'slots', id);
 
 function isSubmodule(dir) {
-  const rel = path.relative(ROOT, dir).replaceAll('\\', '/');
+  const rel = toPosix(path.relative(ROOT, dir));
   try {
     return exec('git', ['config', '-f', '.gitmodules', '--get-regexp', 'path'], { cwd: ROOT })
       .split('\n')
@@ -31,7 +31,7 @@ function ensureCheckout(dir) {
 }
 
 // Puts `overrides` at the top of the `overrides:` block of pnpm-workspace.yaml.
-export function setPnpmOverrides(dir, overrides) {
+function setPnpmOverrides(dir, overrides) {
   const file = path.join(dir, 'pnpm-workspace.yaml');
   const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
   let start = lines.findIndex((line) => /^overrides:\s*$/.test(line));
@@ -78,7 +78,7 @@ function restoreRolldown(dir) {
       fs.unlinkSync(item.path);
     } catch {}
     if (item.moved) fs.renameSync(item.moved, item.path);
-    else fs.symlinkSync(item.link, item.path, isWin ? 'junction' : 'dir');
+    else linkDir(item.link, item.path);
   }
   fs.rmSync(recordFile, { force: true });
 }
@@ -86,7 +86,7 @@ function restoreRolldown(dir) {
 const latestVersions = new Map();
 
 // The newest npm version of a package, so projects stay on the newest vite and friends.
-export function latest(name) {
+function latest(name) {
   if (!latestVersions.has(name)) latestVersions.set(name, exec('npm', ['view', name, 'version']));
   return latestVersions.get(name);
 }
@@ -100,7 +100,7 @@ function headOf(dir) {
 }
 
 export async function setupProject(id, project, target) {
-  const dir = projectDir(id, project);
+  const dir = projectDir(id);
   const fresh = ensureCheckout(dir);
   const slot = slotPath(id);
   linkDir(target.pkgDir, slot);
@@ -126,10 +126,8 @@ export async function setupProject(id, project, target) {
   if (isSubmodule(dir)) exec('git', ['-C', dir, 'checkout', '-q', '-f', 'HEAD']);
   if (overrides) setPnpmOverrides(dir, overrides);
   const ctx = {
-    dir,
     latest,
-    run: (cmd, args, options = {}) => exec(cmd, args, { cwd: dir, inherit: true, ...options }),
-    setOverrides: (overrides) => setPnpmOverrides(dir, overrides),
+    run: (cmd, args) => exec(cmd, args, { cwd: dir, inherit: true }),
     replace(file, from, to) {
       const full = path.join(dir, file);
       const text = fs.readFileSync(full, 'utf8');
@@ -146,32 +144,17 @@ export async function setupProject(id, project, target) {
   fs.writeFileSync(marker, key);
 }
 
-// The first `node_modules/<name>` from `dir` upward, the way Node resolves a package.
-function findUp(dir, name) {
-  for (let current = dir; ; current = path.dirname(current)) {
-    const candidate = path.join(current, 'node_modules', name);
-    if (fs.existsSync(candidate)) return fs.realpathSync(candidate);
-    if (path.dirname(current) === current) return null;
-  }
-}
-
-// The rolldown that vite loads in `cwd`.
+// The rolldown that vite loads in `cwd`. Node looks for it from the real path of vite.
 function usedRolldown(cwd) {
-  const vite = findUp(cwd, 'vite');
+  const vite = findPackage(cwd, 'vite');
   if (!vite) throw new Error(`No vite installed for ${cwd}`);
-  let current = vite;
-  for (;;) {
-    const candidate = path.join(current, 'node_modules', 'rolldown');
-    if (fs.existsSync(candidate)) return fs.realpathSync(candidate);
-    const parent = path.dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
+  const rolldown = findPackage(fs.realpathSync(vite), 'rolldown');
+  return rolldown && fs.realpathSync(rolldown);
 }
 
 // Points the project at `target` and returns the directory to run the case in.
-export function switchProject(id, project, projectCase, target) {
-  const dir = projectDir(id, project);
+export function switchProject(id, projectCase, target) {
+  const dir = projectDir(id);
   if (!fs.existsSync(path.join(dir, MARKER))) throw new Error(`${id} is not set up. Run \`just setup\`.`);
   linkDir(target.pkgDir, slotPath(id));
   const cwd = path.join(dir, projectCase.cwd ?? '');

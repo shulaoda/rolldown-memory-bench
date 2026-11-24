@@ -1,4 +1,5 @@
 import { three10x } from '../scripts/inputs.mjs';
+import { median } from '../scripts/util.mjs';
 
 // Builds again and again with a pause between them, like watch mode or a build service. Each
 // output is dropped and never collected by hand. A pause longer than the time the allocator waits
@@ -17,12 +18,6 @@ export const meta = {
 export const setup = () => three10x();
 
 const MARKS = new Set([2, 5, 10]);
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
 
 export async function run({ rolldown, variant, input, mark, metric, sleep }) {
   const times = [];
