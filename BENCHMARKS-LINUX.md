@@ -3,15 +3,14 @@
 `just bench` writes this file after every run, and `just report <results.json> ...` writes it again from saved runs.
 
 - Machine: linux arm64 (7.2.12-orbstack-00394-gbecdd6130068), unknown, 13 cores, 16 GB, Node v22.22.1, transparent huge pages `madvise`
-- Run 2026-11-24 05:27 UTC: `just bench all --bin base=/Users/shulaoda/workspace/voidzero/rolldown-wt-base --bin pr=/Users/shulaoda/workspace/voidzero/rolldown-memory-reclaim --out BENCHMARKS-LINUX.md`
-- Run 2026-11-24 07:41 UTC: `just bench lobehub:build-sourcemap --rounds 9 --bin base=/Users/shulaoda/workspace/voidzero/rolldown-wt-base --bin pr=/Users/shulaoda/workspace/voidzero/rolldown-memory-reclaim --out /private/tmp/claude-501/-Users-shulaoda-workspace-voidzero-rolldown/0d96d600-5850-4860-a1fc-044942e0aa9f/scratchpad/newbench/linux-sm9.md`
+- Run 2026-11-26 08:51 UTC: `just bench quick --bin base=/Users/shulaoda/workspace/voidzero/rolldown-wt-base --bin pr=/Users/shulaoda/workspace/voidzero/rolldown-memory-reclaim --out BENCHMARKS-LINUX.md`
 - Memory: `RssAnon`, peak: the highest `VmHWM` of the process. Numbers compare only on the same machine.
 - Load average (1 min) when a run started: 0.1 to 3.8, on 13 cores
 
 | Bin | rolldown | From | Commit |
 | --- | --- | --- | --- |
-| base | 1.3.3 | repo `/Users/shulaoda/workspace/voidzero/rolldown-wt-base` | ab231fbad5 |
-| pr | 1.3.3 | repo `/Users/shulaoda/workspace/voidzero/rolldown-memory-reclaim` | 12b8d0663a |
+| base | 1.3.3 | repo `/Users/shulaoda/workspace/voidzero/rolldown-wt-base` | e641a934ec |
+| pr | 1.3.3 | repo `/Users/shulaoda/workspace/voidzero/rolldown-memory-reclaim` | ce99614c34 |
 
 Every number is the median over the rounds, with the range in parentheses. A change is from `base`. A change marked noise is not a clear difference: its ranges overlap, or a side has fewer than 3 rounds.
 
@@ -19,35 +18,23 @@ Every number is the median over the rounds, with the range in parentheses. A cha
 
 | Case | Peak | CPU time | Time | Memory at the last mark |
 | --- | ---: | ---: | ---: | ---: |
-| held-outputs:sourcemap | -20.1% (-444 MB) | +2.0% (noise) | all builds: -1.7% (noise) | idle 2s: -93.7% (-1987 MB) |
-| held-outputs:plain | -18.8% (-273 MB) | +0.5% (noise) | all builds: -0.3% (noise) | idle 2s: -90.3% (-1216 MB) |
-| issue-10985-tight-loop:close | -49.6% (-579 MB) | +0.5% (noise) | all builds: -0.6% (noise) | idle 5s: -89.0% (-983 MB) |
-| issue-10985-tight-loop:generate | -49.5% (-576 MB) | -0.2% (noise) | all builds: -0.1% (noise) | idle 5s: -89.0% (-979 MB) |
-| issue-11143-api-idle:6-builds | -19.7% (-378 MB) | +3.1% | all builds: +2.2% (noise) | idle 12s: -89.2% (-1607 MB) |
-| issue-11143-api-idle:1-build | -20.4% (-239 MB) | -1.5% (noise) | all builds: -2.7% (noise) | idle 12s: -85.1% (-875 MB) |
-| issue-11233-optimizer-threads:default-threads | -28.1% (-220 MB) | -3.6% (noise) | build: -3.5% (noise) | idle 10s: -82.9% (-574 MB) |
-| issue-11233-optimizer-threads:4-threads | -24.4% (-147 MB) | 0.0% (noise) | build: +0.8% (noise) | idle 10s: -86.0% (-432 MB) |
-| many-chunks:plain | -22.8% (-221 MB) | +6.0% (noise) | build: -1.0% (noise) | idle 2s: -83.5% (-757 MB) |
-| many-chunks:sourcemap | -27.5% (-302 MB) | +1.6% (noise) | build: +2.2% (noise) | idle 2s: -85.3% (-885 MB) |
-| rebuild-gaps:gap-0 | -44.2% (-989 MB) | +1.6% (noise) | later builds (median): +0.8% (noise) | before build 10: -45.2% (-918 MB) |
-| rebuild-gaps:gap-300ms | -42.3% (-905 MB) | +1.2% (noise) | later builds (median): -1.4% (noise) | before build 10: -52.3% (-1005 MB) |
-| rebuild-gaps:gap-1s | -50.4% (-942 MB) | +2.8% (noise) | later builds (median): -1.7% (noise) | before build 10: -81.0% (-1172 MB) |
-| rebuild-gaps:gap-3s | -50.4% (-940 MB) | +4.7% (noise) | later builds (median): +0.4% (noise) | before build 10: -82.9% (-1316 MB) |
-| three10x:plain | -19.4% (-188 MB) | +4.4% (noise) | build: -0.7% (noise) | idle 2s: -85.6% (-739 MB) |
-| three10x:sourcemap | -22.4% (-252 MB) | +3.4% (noise) | build: -1.8% (noise) | idle 2s: -87.9% (-897 MB) |
-| three10x:sourcemap-minify | -20.2% (-234 MB) | +4.2% (noise) | build: -1.3% (noise) | idle 2s: -88.2% (-906 MB) |
-| issue-11189:bundled | -58.7% (-552 MB) | +15.8% | ready: -0.6% (noise) | edit 20: -69.5% (-602 MB) |
-| issue-11189:unbundled | -2.9% (-10.1 MB, noise) | -0.4% (noise) | ready: +1.5% (noise) | edit 20: +0.5% (+1.3 MB, noise) |
-| issue-11189:bundled-gc | -55.5% (-504 MB) | +15.1% | ready: +1.6% (noise) | edit 20: -66.2% (-548 MB) |
-| issue-11189:bundled-tailwind-leaf | -17.7% (-87.0 MB) | +12.6% (noise) | ready: +1.4% (noise) | edit 20: -30.7% (-124 MB) |
-| lobehub:build | -16.8% (-1016 MB) | +0.3% (noise) | process wall time: +1.0% (noise) | - |
-| lobehub:build-sourcemap | -15.8% (-1122 MB) | -0.5% (noise) | process wall time: -0.8% (noise) | - |
-| lobehub:dev | -24.7% (-965 MB) | -0.4% (noise) | ready: +0.2% (noise) | idle 270s: -60.2% (-1680 MB) |
-| lobehub:dev-warm | -10.4% (-233 MB) | -1.0% (noise) | ready: -1.2% (noise) | idle 270s: -8.8% (-85.1 MB) |
-| rolldown-9330-repro:dev | -26.5% (-746 MB) | +0.8% (noise) | ready: +0.4% (noise) | idle 90s: -77.0% (-1705 MB) |
-| vinext:build | -30.6% (-345 MB) | +1.2% (noise) | process wall time: -0.8% (noise) | - |
-| vinext:playground-build | -16.8% (-341 MB) | -10.8% | process wall time: -11.0% | - |
-| vue-vben-admin:build | -19.4% (-421 MB) | +1.5% (noise) | process wall time: +3.1% (noise) | - |
+| held-outputs:sourcemap | -22.8% (-512 MB) | +3.5% (noise) | all builds: -0.1% (noise) | idle 2s: -92.1% (-1944 MB) |
+| issue-10985-tight-loop:close | -49.0% (-564 MB) | +1.1% (noise) | all builds: -0.1% (noise) | idle 5s: -88.4% (-962 MB) |
+| issue-11143-api-idle:6-builds | -21.7% (-422 MB) | -0.3% (noise) | all builds: -0.7% (noise) | idle 12s: -89.7% (-1660 MB) |
+| issue-11233-optimizer-threads:default-threads | -31.0% (-245 MB) | -2.1% (noise) | build: -3.7% (noise) | idle 10s: -82.3% (-571 MB) |
+| many-chunks:sourcemap | -28.8% (-314 MB) | +3.8% (noise) | build: +4.4% | idle 2s: -82.5% (-847 MB) |
+| rebuild-gaps:gap-0 | -44.0% (-957 MB) | +2.1% (noise) | later builds (median): -1.4% (noise) | before build 10: -45.6% (-906 MB) |
+| rebuild-gaps:gap-300ms | -42.2% (-893 MB) | +0.6% (noise) | later builds (median): +0.0% (noise) | before build 10: -52.1% (-971 MB) |
+| rebuild-gaps:gap-1s | -49.9% (-926 MB) | +6.6% | later builds (median): +1.9% (noise) | before build 10: -77.4% (-1058 MB) |
+| rebuild-gaps:gap-3s | -48.5% (-883 MB) | -0.6% (noise) | later builds (median): -1.0% (noise) | before build 10: -79.6% (-1259 MB) |
+| three10x:sourcemap | -22.2% (-247 MB) | +3.1% | build: -1.2% (noise) | idle 2s: -84.0% (-845 MB) |
+| issue-11189:bundled | -57.1% (-528 MB) | +16.8% | ready: 0.0% (noise) | edit 20: -66.8% (-568 MB) |
+| lobehub:build | -16.5% (-978 MB) | -1.3% | process wall time: -1.2% | - |
+| lobehub:build-sourcemap | -19.3% (-1337 MB) | +1.1% (noise) | process wall time: +0.6% (noise) | - |
+| lobehub:dev | -25.6% (-990 MB) | +0.1% (noise) | ready: +12.4% (noise) | idle 270s: -56.7% (-1605 MB) |
+| rolldown-9330-repro:dev | -24.9% (-682 MB) | -7.1% | ready: 0.0% (noise) | idle 90s: -74.8% (-1596 MB) |
+| vinext:build | -25.8% (-285 MB) | +0.2% (noise) | process wall time: +1.9% (noise) | - |
+| vue-vben-admin:build | -20.6% (-449 MB) | -1.2% (noise) | process wall time: -0.8% (noise) | - |
 
 ## held-outputs
 
@@ -55,29 +42,16 @@ three.js x10, 10 back-to-back builds that keep their outputs (dashboard shape).
 
 ### held-outputs:sourcemap
 
-5 rounds, load 0.3 to 0.5.
+3 rounds, load 0.8 to 1.1.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2212 (2194-2267) | 1768 (1750-1797) | -20.1% (-444 MB) |
-| process cpu time | 5.64s (5.59s-5.94s) | 5.75s (5.73s-5.83s) | +2.0% (noise) |
-| all builds | 2.24s (2.20s-2.34s) | 2.20s (2.18s-2.26s) | -1.7% (noise) |
-| RssAnon @ 10 outputs held (MB) | 2122 (2074-2136) | 1639 (1609-1662) | -22.7% (-482 MB) |
-| RssAnon @ after gc (MB) | 2122 (2074-2136) | 1639 (1609-1662) | -22.7% (-483 MB) |
-| RssAnon @ idle 2s (MB) | 2122 (2074-2136) | 135 (127-140) | -93.7% (-1987 MB) |
-
-### held-outputs:plain
-
-5 rounds, load 1.5 to 2.2.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1454 (1412-1533) | 1180 (1164-1220) | -18.8% (-273 MB) |
-| process cpu time | 4.99s (4.94s-5.17s) | 5.01s (5.01s-5.18s) | +0.5% (noise) |
-| all builds | 1.80s (1.78s-1.87s) | 1.79s (1.78s-1.80s) | -0.3% (noise) |
-| RssAnon @ 10 outputs held (MB) | 1347 (1305-1426) | 1074 (1057-1114) | -20.3% (-273 MB) |
-| RssAnon @ after gc (MB) | 1347 (1305-1427) | 1074 (1057-1114) | -20.3% (-273 MB) |
-| RssAnon @ idle 2s (MB) | 1347 (1305-1427) | 131 (130-135) | -90.3% (-1216 MB) |
+| peak VmHWM (MB) | 2244 (2220-2264) | 1732 (1731-1759) | -22.8% (-512 MB) |
+| process cpu time | 5.81s (5.67s-5.94s) | 6.01s (5.71s-6.05s) | +3.5% (noise) |
+| all builds | 2.25s (2.24s-2.32s) | 2.24s (2.18s-2.36s) | -0.1% (noise) |
+| RssAnon @ 10 outputs held (MB) | 2109 (2083-2129) | 1623 (1593-1648) | -23.1% (-486 MB) |
+| RssAnon @ after gc (MB) | 2110 (2083-2130) | 1623 (1593-1648) | -23.1% (-487 MB) |
+| RssAnon @ idle 2s (MB) | 2110 (2083-2130) | 166 (163-173) | -92.1% (-1944 MB) |
 
 ## issue-10985-tight-loop
 
@@ -85,37 +59,20 @@ Memory across 150 builds in a tight loop, then idle. Issues: [#10985](https://gi
 
 ### issue-10985-tight-loop:close
 
-5 rounds, load 1 to 1.8.
+3 rounds, load 0.7 to 0.9.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1167 (1149-1193) | 588 (584-618) | -49.6% (-579 MB) |
-| process cpu time | 8.11s (7.99s-8.19s) | 8.14s (8.09s-8.27s) | +0.5% (noise) |
-| all builds | 3.34s (3.32s-3.40s) | 3.32s (3.30s-3.35s) | -0.6% (noise) |
-| RssAnon @ build 25 (MB) | 883 (876-960) | 461 (440-489) | -47.8% (-422 MB) |
-| RssAnon @ build 50 (MB) | 995 (987-1054) | 500 (497-525) | -49.8% (-496 MB) |
-| RssAnon @ build 75 (MB) | 1046 (1030-1084) | 500 (497-533) | -52.2% (-546 MB) |
-| RssAnon @ build 100 (MB) | 1072 (1052-1112) | 512 (497-543) | -52.3% (-560 MB) |
-| RssAnon @ build 125 (MB) | 1093 (1076-1124) | 526 (522-554) | -51.9% (-568 MB) |
-| RssAnon @ build 150 (MB) | 1104 (1086-1130) | 526 (522-556) | -52.4% (-578 MB) |
-| RssAnon @ idle 5s (MB) | 1104 (1086-1130) | 121 (121-123) | -89.0% (-983 MB) |
-
-### issue-10985-tight-loop:generate
-
-5 rounds, load 0.7 to 2.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1163 (1143-1169) | 587 (584-620) | -49.5% (-576 MB) |
-| process cpu time | 8.17s (8.13s-8.23s) | 8.15s (8.04s-8.24s) | -0.2% (noise) |
-| all builds | 3.36s (3.33s-3.40s) | 3.35s (3.30s-3.40s) | -0.1% (noise) |
-| RssAnon @ build 25 (MB) | 893 (859-926) | 468 (442-471) | -47.6% (-425 MB) |
-| RssAnon @ build 50 (MB) | 997 (964-1028) | 514 (505-523) | -48.5% (-484 MB) |
-| RssAnon @ build 75 (MB) | 1039 (1017-1068) | 523 (521-546) | -49.7% (-516 MB) |
-| RssAnon @ build 100 (MB) | 1061 (1053-1078) | 525 (522-546) | -50.6% (-537 MB) |
-| RssAnon @ build 125 (MB) | 1074 (1069-1094) | 525 (522-546) | -51.2% (-550 MB) |
-| RssAnon @ build 150 (MB) | 1100 (1080-1106) | 525 (522-558) | -52.3% (-575 MB) |
-| RssAnon @ idle 5s (MB) | 1100 (1080-1106) | 121 (120-134) | -89.0% (-979 MB) |
+| peak VmHWM (MB) | 1151 (1133-1167) | 587 (586-588) | -49.0% (-564 MB) |
+| process cpu time | 8.06s (8.05s-8.17s) | 8.15s (8.10s-8.24s) | +1.1% (noise) |
+| all builds | 3.36s (3.32s-3.38s) | 3.35s (3.28s-3.44s) | -0.1% (noise) |
+| RssAnon @ build 25 (MB) | 893 (820-946) | 454 (441-473) | -49.2% (-440 MB) |
+| RssAnon @ build 50 (MB) | 1024 (950-1028) | 505 (490-508) | -50.6% (-519 MB) |
+| RssAnon @ build 75 (MB) | 1038 (1000-1050) | 524 (524-525) | -49.5% (-514 MB) |
+| RssAnon @ build 100 (MB) | 1054 (1010-1080) | 524 (524-525) | -50.3% (-530 MB) |
+| RssAnon @ build 125 (MB) | 1072 (1038-1102) | 524 (524-525) | -51.1% (-548 MB) |
+| RssAnon @ build 150 (MB) | 1088 (1070-1104) | 524 (524-525) | -51.8% (-564 MB) |
+| RssAnon @ idle 5s (MB) | 1088 (1070-1104) | 126 (123-134) | -88.4% (-962 MB) |
 
 ## issue-11143-api-idle
 
@@ -123,33 +80,18 @@ API builds with in-memory files and maps, then outputs dropped and idle. Issues:
 
 ### issue-11143-api-idle:6-builds
 
-5 rounds, load 0.4 to 2.2.
+3 rounds, load 0.4 to 0.6.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1921 (1873-1978) | 1543 (1521-1576) | -19.7% (-378 MB) |
-| process cpu time | 4.02s (4.00s-4.06s) | 4.15s (4.09s-4.53s) | +3.1% |
-| all builds | 1.78s (1.75s-1.84s) | 1.82s (1.76s-2.00s) | +2.2% (noise) |
-| RssAnon @ before builds (MB) | 124 (122-125) | 124 (123-124) | -0.1% (-0.1 MB, noise) |
-| RssAnon @ outputs held (MB) | 1802 (1764-1869) | 1415 (1397-1477) | -21.5% (-387 MB) |
-| RssAnon @ idle 1.5s (MB) | 1802 (1764-1869) | 194 (191-198) | -89.3% (-1608 MB) |
-| RssAnon @ idle 4s (MB) | 1802 (1764-1869) | 195 (191-205) | -89.2% (-1607 MB) |
-| RssAnon @ idle 12s (MB) | 1802 (1764-1869) | 195 (191-208) | -89.2% (-1607 MB) |
-
-### issue-11143-api-idle:1-build
-
-5 rounds, load 0.1 to 0.3.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1170 (1159-1202) | 931 (930-947) | -20.4% (-239 MB) |
-| process cpu time | 955ms (886ms-968ms) | 941ms (929ms-988ms) | -1.5% (noise) |
-| all builds | 314ms (294ms-326ms) | 305ms (297ms-311ms) | -2.7% (noise) |
-| RssAnon @ before builds (MB) | 123 (123-124) | 123 (123-124) | +0.1% (+0.1 MB, noise) |
-| RssAnon @ outputs held (MB) | 1063 (1052-1093) | 799 (787-841) | -24.8% (-264 MB) |
-| RssAnon @ idle 1.5s (MB) | 1063 (1052-1093) | 188 (182-190) | -82.3% (-874 MB) |
-| RssAnon @ idle 4s (MB) | 1063 (1052-1093) | 188 (182-190) | -82.3% (-874 MB) |
-| RssAnon @ idle 12s (MB) | 1028 (1017-1058) | 153 (146-154) | -85.1% (-875 MB) |
+| peak VmHWM (MB) | 1946 (1939-1964) | 1524 (1514-1539) | -21.7% (-422 MB) |
+| process cpu time | 4.09s (4.06s-4.14s) | 4.08s (4.07s-4.08s) | -0.3% (noise) |
+| all builds | 1.80s (1.80s-1.90s) | 1.79s (1.77s-1.80s) | -0.7% (noise) |
+| RssAnon @ before builds (MB) | 123 (123-124) | 124 (123-124) | +0.5% (+0.6 MB, noise) |
+| RssAnon @ outputs held (MB) | 1851 (1830-1855) | 1396 (1395-1402) | -24.6% (-455 MB) |
+| RssAnon @ idle 1.5s (MB) | 1851 (1830-1855) | 185 (184-189) | -90.0% (-1666 MB) |
+| RssAnon @ idle 4s (MB) | 1851 (1830-1855) | 185 (184-189) | -90.0% (-1666 MB) |
+| RssAnon @ idle 12s (MB) | 1851 (1830-1855) | 191 (185-194) | -89.7% (-1660 MB) |
 
 ## issue-11233-optimizer-threads
 
@@ -157,61 +99,34 @@ One optimizer-like pass over typescript, codemirror and vue, then idle. Issues: 
 
 ### issue-11233-optimizer-threads:default-threads
 
-5 rounds, load 0.1 to 0.1.
+3 rounds, load 0.1 to 0.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 782 (731-791) | 562 (540-581) | -28.1% (-220 MB) |
-| process cpu time | 503ms (458ms-524ms) | 485ms (468ms-514ms) | -3.6% (noise) |
-| build | 271ms (258ms-287ms) | 262ms (255ms-289ms) | -3.5% (noise) |
-| RssAnon @ output held (MB) | 696 (650-711) | 471 (454-508) | -32.3% (-225 MB) |
-| RssAnon @ idle 2s (MB) | 697 (651-711) | 122 (120-125) | -82.4% (-574 MB) |
-| RssAnon @ idle 10s (MB) | 692 (647-707) | 118 (116-128) | -82.9% (-574 MB) |
-
-### issue-11233-optimizer-threads:4-threads
-
-5 rounds, load 0.1 to 0.2.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 603 (585-620) | 456 (442-476) | -24.4% (-147 MB) |
-| process cpu time | 476ms (460ms-489ms) | 476ms (455ms-486ms) | 0.0% (noise) |
-| build | 261ms (252ms-273ms) | 264ms (254ms-271ms) | +0.8% (noise) |
-| RssAnon @ output held (MB) | 506 (500-531) | 378 (366-401) | -25.2% (-128 MB) |
-| RssAnon @ idle 2s (MB) | 507 (500-532) | 73.8 (68.2-75.4) | -85.4% (-433 MB) |
-| RssAnon @ idle 10s (MB) | 503 (496-528) | 70.2 (64.2-71.3) | -86.0% (-432 MB) |
+| peak VmHWM (MB) | 792 (774-810) | 547 (543-549) | -31.0% (-245 MB) |
+| process cpu time | 480ms (480ms-509ms) | 470ms (463ms-495ms) | -2.1% (noise) |
+| build | 267ms (258ms-283ms) | 257ms (257ms-259ms) | -3.7% (noise) |
+| RssAnon @ output held (MB) | 697 (697-712) | 454 (452-466) | -35.0% (-244 MB) |
+| RssAnon @ idle 2s (MB) | 698 (697-713) | 126 (124-127) | -82.0% (-572 MB) |
+| RssAnon @ idle 10s (MB) | 694 (693-709) | 123 (121-123) | -82.3% (-571 MB) |
 
 ## many-chunks
 
 three.js x10 with one dynamic import per file (about 3,700 chunks), one build.
 
-### many-chunks:plain
-
-5 rounds, load 0.1 to 0.1.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 969 (958-984) | 749 (743-767) | -22.8% (-221 MB) |
-| process cpu time | 811ms (777ms-846ms) | 860ms (841ms-873ms) | +6.0% (noise) |
-| build | 160ms (156ms-167ms) | 158ms (157ms-163ms) | -1.0% (noise) |
-| chunks | 3692 (3692-3692) | 3692 (3692-3692) | 0.0% (noise) |
-| RssAnon @ output held (MB) | 905 (894-920) | 685 (678-702) | -24.3% (-220 MB) |
-| RssAnon @ after gc (MB) | 906 (895-921) | 686 (680-704) | -24.3% (-220 MB) |
-| RssAnon @ idle 2s (MB) | 906 (895-921) | 149 (143-150) | -83.5% (-757 MB) |
-
 ### many-chunks:sourcemap
 
-5 rounds, load 0.2 to 0.2.
+3 rounds, load 0.1 to 0.1.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1101 (1092-1119) | 799 (792-818) | -27.5% (-302 MB) |
-| process cpu time | 932ms (893ms-939ms) | 947ms (929ms-1.03s) | +1.6% (noise) |
-| build | 184ms (182ms-187ms) | 188ms (187ms-197ms) | +2.2% (noise) |
+| peak VmHWM (MB) | 1090 (1086-1099) | 777 (765-777) | -28.8% (-314 MB) |
+| process cpu time | 901ms (875ms-921ms) | 935ms (914ms-965ms) | +3.8% (noise) |
+| build | 184ms (184ms-186ms) | 192ms (190ms-194ms) | +4.4% |
 | chunks | 3692 (3692-3692) | 3692 (3692-3692) | 0.0% (noise) |
-| RssAnon @ output held (MB) | 1032 (1025-1053) | 733 (727-753) | -29.0% (-300 MB) |
-| RssAnon @ after gc (MB) | 1038 (1029-1056) | 736 (730-756) | -29.1% (-302 MB) |
-| RssAnon @ idle 2s (MB) | 1038 (1029-1056) | 153 (152-155) | -85.3% (-885 MB) |
+| RssAnon @ output held (MB) | 1022 (1019-1032) | 711 (700-711) | -30.4% (-311 MB) |
+| RssAnon @ after gc (MB) | 1027 (1022-1036) | 714 (702-714) | -30.5% (-313 MB) |
+| RssAnon @ idle 2s (MB) | 1027 (1022-1036) | 180 (178-184) | -82.5% (-847 MB) |
 
 ## rebuild-gaps
 
@@ -219,106 +134,80 @@ three.js x10 with sourcemap, 10 builds with a pause between them.
 
 ### rebuild-gaps:gap-0
 
-5 rounds, load 0.1 to 0.6.
+3 rounds, load 0.1 to 0.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2239 (2180-2246) | 1250 (1221-1292) | -44.2% (-989 MB) |
-| process cpu time | 5.55s (5.48s-5.72s) | 5.64s (5.56s-5.66s) | +1.6% (noise) |
-| later builds (median) | 214ms (212ms-219ms) | 216ms (214ms-217ms) | +0.8% (noise) |
-| first build | 214ms (210ms-229ms) | 216ms (213ms-218ms) | +0.8% (noise) |
-| later builds (max) | 231ms (219ms-247ms) | 222ms (219ms-229ms) | -4.0% (noise) |
-| RssAnon @ before build 2 (MB) | 1029 (1005-1048) | 741 (741-743) | -28.0% (-288 MB) |
-| RssAnon @ before build 5 (MB) | 1444 (1440-1487) | 1046 (1018-1075) | -27.6% (-398 MB) |
-| RssAnon @ before build 10 (MB) | 2032 (1905-2040) | 1114 (1086-1157) | -45.2% (-918 MB) |
+| peak VmHWM (MB) | 2174 (2172-2273) | 1217 (1217-1280) | -44.0% (-957 MB) |
+| process cpu time | 5.54s (5.48s-5.72s) | 5.65s (5.62s-5.66s) | +2.1% (noise) |
+| later builds (median) | 217ms (212ms-232ms) | 214ms (214ms-216ms) | -1.4% (noise) |
+| first build | 213ms (209ms-214ms) | 215ms (212ms-216ms) | +0.9% (noise) |
+| later builds (max) | 222ms (221ms-245ms) | 222ms (221ms-222ms) | -0.1% (noise) |
+| RssAnon @ before build 2 (MB) | 1004 (999-1047) | 733 (729-757) | -27.0% (-271 MB) |
+| RssAnon @ before build 5 (MB) | 1435 (1397-1488) | 1032 (1031-1073) | -28.1% (-403 MB) |
+| RssAnon @ before build 10 (MB) | 1988 (1957-2042) | 1082 (1080-1139) | -45.6% (-906 MB) |
 
 ### rebuild-gaps:gap-300ms
 
-5 rounds, load 0.6 to 3.2.
+3 rounds, load 0.3 to 0.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2140 (2115-2166) | 1235 (1194-1255) | -42.3% (-905 MB) |
-| process cpu time | 6.72s (6.71s-7.29s) | 6.80s (6.67s-7.17s) | +1.2% (noise) |
-| later builds (median) | 239ms (232ms-242ms) | 236ms (233ms-239ms) | -1.4% (noise) |
-| first build | 217ms (212ms-239ms) | 215ms (211ms-224ms) | -0.7% (noise) |
-| later builds (max) | 248ms (239ms-315ms) | 243ms (238ms-251ms) | -1.9% (noise) |
-| RssAnon @ before build 2 (MB) | 1018 (997-1025) | 737 (717-788) | -27.6% (-281 MB) |
-| RssAnon @ before build 5 (MB) | 1476 (1447-1531) | 1056 (1012-1079) | -28.4% (-420 MB) |
-| RssAnon @ before build 10 (MB) | 1920 (1888-1922) | 915 (897-921) | -52.3% (-1005 MB) |
+| peak VmHWM (MB) | 2117 (2104-2134) | 1224 (1216-1267) | -42.2% (-893 MB) |
+| process cpu time | 6.79s (6.49s-6.90s) | 6.83s (6.69s-6.93s) | +0.6% (noise) |
+| later builds (median) | 232ms (229ms-239ms) | 233ms (232ms-236ms) | +0.0% (noise) |
+| first build | 217ms (217ms-221ms) | 214ms (213ms-216ms) | -1.2% |
+| later builds (max) | 244ms (238ms-263ms) | 240ms (237ms-246ms) | -1.6% (noise) |
+| RssAnon @ before build 2 (MB) | 1008 (1006-1019) | 741 (731-760) | -26.5% (-267 MB) |
+| RssAnon @ before build 5 (MB) | 1449 (1428-1456) | 1034 (1032-1115) | -28.6% (-415 MB) |
+| RssAnon @ before build 10 (MB) | 1863 (1848-1901) | 892 (889-896) | -52.1% (-971 MB) |
 
 ### rebuild-gaps:gap-1s
 
-5 rounds, load 1.8 to 3.8.
+3 rounds, load 0.3 to 1.9.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1869 (1846-1920) | 927 (916-933) | -50.4% (-942 MB) |
-| process cpu time | 6.92s (6.85s-7.13s) | 7.11s (6.77s-7.14s) | +2.8% (noise) |
-| later builds (median) | 243ms (230ms-245ms) | 238ms (237ms-243ms) | -1.7% (noise) |
-| first build | 218ms (211ms-270ms) | 219ms (217ms-238ms) | +0.6% (noise) |
-| later builds (max) | 255ms (246ms-260ms) | 247ms (242ms-253ms) | -3.1% (noise) |
-| RssAnon @ before build 2 (MB) | 1015 (997-1042) | 278 (274-283) | -72.6% (-737 MB) |
-| RssAnon @ before build 5 (MB) | 1499 (1429-1504) | 271 (270-279) | -81.9% (-1228 MB) |
-| RssAnon @ before build 10 (MB) | 1447 (1368-1511) | 275 (264-282) | -81.0% (-1172 MB) |
+| peak VmHWM (MB) | 1857 (1800-1862) | 931 (923-935) | -49.9% (-926 MB) |
+| process cpu time | 6.62s (6.59s-6.74s) | 7.05s (6.91s-7.08s) | +6.6% |
+| later builds (median) | 232ms (230ms-239ms) | 237ms (230ms-242ms) | +1.9% (noise) |
+| first build | 216ms (215ms-225ms) | 221ms (216ms-249ms) | +2.1% (noise) |
+| later builds (max) | 254ms (243ms-353ms) | 250ms (248ms-260ms) | -1.4% (noise) |
+| RssAnon @ before build 2 (MB) | 1011 (996-1011) | 306 (301-309) | -69.8% (-705 MB) |
+| RssAnon @ before build 5 (MB) | 1453 (1418-1491) | 298 (294-310) | -79.5% (-1155 MB) |
+| RssAnon @ before build 10 (MB) | 1367 (1357-1372) | 309 (296-311) | -77.4% (-1058 MB) |
 
 ### rebuild-gaps:gap-3s
 
-5 rounds, load 0.1 to 1.5.
+3 rounds, load 0.4 to 1.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1866 (1820-1882) | 926 (916-927) | -50.4% (-940 MB) |
-| process cpu time | 6.81s (6.76s-7.07s) | 7.13s (6.73s-7.30s) | +4.7% (noise) |
-| later builds (median) | 234ms (231ms-238ms) | 235ms (234ms-243ms) | +0.4% (noise) |
-| first build | 219ms (210ms-242ms) | 218ms (208ms-224ms) | -0.4% (noise) |
-| later builds (max) | 249ms (243ms-252ms) | 255ms (248ms-260ms) | +2.2% (noise) |
-| RssAnon @ before build 2 (MB) | 1035 (1029-1045) | 276 (270-281) | -73.3% (-759 MB) |
-| RssAnon @ before build 5 (MB) | 1308 (1283-1333) | 271 (270-280) | -79.3% (-1038 MB) |
-| RssAnon @ before build 10 (MB) | 1588 (1566-1626) | 272 (267-277) | -82.9% (-1316 MB) |
+| peak VmHWM (MB) | 1819 (1812-1858) | 936 (928-950) | -48.5% (-883 MB) |
+| process cpu time | 7.14s (6.88s-7.30s) | 7.10s (6.95s-7.37s) | -0.6% (noise) |
+| later builds (median) | 244ms (234ms-245ms) | 241ms (236ms-243ms) | -1.0% (noise) |
+| first build | 234ms (216ms-253ms) | 221ms (219ms-236ms) | -5.5% (noise) |
+| later builds (max) | 287ms (245ms-295ms) | 266ms (259ms-271ms) | -7.2% (noise) |
+| RssAnon @ before build 2 (MB) | 1013 (1008-1023) | 310 (308-318) | -69.4% (-703 MB) |
+| RssAnon @ before build 5 (MB) | 1289 (1261-1295) | 313 (302-320) | -75.8% (-977 MB) |
+| RssAnon @ before build 10 (MB) | 1581 (1538-1612) | 322 (322-326) | -79.6% (-1259 MB) |
 
 ## three10x
 
 three.js x10, one build: peak, output held, after GC, idle.
 
-### three10x:plain
-
-5 rounds, load 0.1 to 0.1.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 967 (950-979) | 779 (774-787) | -19.4% (-188 MB) |
-| process cpu time | 589ms (579ms-596ms) | 615ms (582ms-654ms) | +4.4% (noise) |
-| build | 174ms (172ms-185ms) | 172ms (171ms-184ms) | -0.7% (noise) |
-| RssAnon @ output held (MB) | 863 (845-875) | 677 (672-685) | -21.6% (-186 MB) |
-| RssAnon @ after gc (MB) | 863 (845-875) | 677 (672-685) | -21.6% (-186 MB) |
-| RssAnon @ idle 2s (MB) | 863 (845-875) | 124 (123-126) | -85.6% (-739 MB) |
-
 ### three10x:sourcemap
 
-5 rounds.
+3 rounds, load 0.2 to 0.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1126 (1099-1142) | 874 (873-896) | -22.4% (-252 MB) |
-| process cpu time | 639ms (623ms-687ms) | 661ms (621ms-701ms) | +3.4% (noise) |
-| build | 215ms (207ms-236ms) | 212ms (207ms-221ms) | -1.8% (noise) |
-| RssAnon @ output held (MB) | 1020 (993-1035) | 763 (742-791) | -25.2% (-257 MB) |
-| RssAnon @ after gc (MB) | 1020 (993-1036) | 763 (742-791) | -25.2% (-257 MB) |
-| RssAnon @ idle 2s (MB) | 1020 (993-1036) | 123 (122-126) | -87.9% (-897 MB) |
-
-### three10x:sourcemap-minify
-
-5 rounds, load 1.1 to 1.3.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1162 (1152-1178) | 928 (924-945) | -20.2% (-234 MB) |
-| process cpu time | 709ms (701ms-802ms) | 739ms (724ms-822ms) | +4.2% (noise) |
-| build | 286ms (283ms-308ms) | 282ms (279ms-293ms) | -1.3% (noise) |
-| RssAnon @ output held (MB) | 1027 (1012-1040) | 751 (748-770) | -26.9% (-276 MB) |
-| RssAnon @ after gc (MB) | 1028 (1012-1040) | 751 (749-771) | -26.9% (-276 MB) |
-| RssAnon @ idle 2s (MB) | 1028 (1012-1040) | 122 (121-124) | -88.2% (-906 MB) |
+| peak VmHWM (MB) | 1112 (1098-1119) | 865 (863-866) | -22.2% (-247 MB) |
+| process cpu time | 645ms (611ms-646ms) | 665ms (664ms-676ms) | +3.1% |
+| build | 213ms (212ms-216ms) | 210ms (210ms-214ms) | -1.2% (noise) |
+| RssAnon @ output held (MB) | 1005 (991-1013) | 736 (734-752) | -26.8% (-269 MB) |
+| RssAnon @ after gc (MB) | 1006 (992-1013) | 736 (734-752) | -26.8% (-270 MB) |
+| RssAnon @ idle 2s (MB) | 1006 (992-1013) | 161 (146-162) | -84.0% (-845 MB) |
 
 ## issue-11189
 
@@ -326,67 +215,19 @@ Bundled dev rebuilds (synthetic React app, 1,500 modules). Issues: [#11189](http
 
 ### issue-11189:bundled
 
-3 rounds, load 0.1 to 0.6.
+3 rounds, load 0.1 to 0.1.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 941 (927-967) | 389 (382-395) | -58.7% (-552 MB) |
-| process cpu time | 1.81s (1.79s-1.90s) | 2.09s (2.07s-2.33s) | +15.8% |
-| ready | 521ms (517ms-522ms) | 518ms (511ms-518ms) | -0.6% (noise) |
+| peak VmHWM (MB) | 926 (912-932) | 397 (394-405) | -57.1% (-528 MB) |
+| process cpu time | 1.85s (1.72s-1.87s) | 2.17s (2.12s-2.26s) | +16.8% |
+| ready | 516ms (516ms-526ms) | 516ms (515ms-518ms) | 0.0% (noise) |
 | crawled urls | 2 (2-2) | 2 (2-2) | 0.0% (noise) |
-| RssAnon @ after load (MB) | 388 (369-393) | 260 (254-264) | -33.0% (-128 MB) |
-| RssAnon @ edit 5 (MB) | 605 (598-609) | 246 (232-251) | -59.4% (-359 MB) |
-| RssAnon @ edit 10 (MB) | 732 (723-747) | 259 (252-270) | -64.7% (-474 MB) |
-| RssAnon @ edit 15 (MB) | 832 (793-846) | 283 (247-284) | -66.0% (-549 MB) |
-| RssAnon @ edit 20 (MB) | 866 (852-894) | 264 (263-280) | -69.5% (-602 MB) |
-
-### issue-11189:unbundled
-
-3 rounds, load 0.1 to 0.2.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 346 (333-349) | 335 (329-341) | -2.9% (-10.1 MB, noise) |
-| process cpu time | 3.39s (3.24s-3.40s) | 3.38s (3.33s-3.44s) | -0.4% (noise) |
-| ready | 521ms (518ms-528ms) | 529ms (528ms-534ms) | +1.5% (noise) |
-| crawled urls | 1542 (1542-1542) | 1542 (1542-1542) | 0.0% (noise) |
-| RssAnon @ after load (MB) | 235 (223-238) | 219 (217-221) | -6.7% (-15.7 MB) |
-| RssAnon @ edit 5 (MB) | 247 (238-250) | 240 (235-247) | -3.0% (-7.3 MB, noise) |
-| RssAnon @ edit 10 (MB) | 249 (238-252) | 240 (237-248) | -3.5% (-8.8 MB, noise) |
-| RssAnon @ edit 15 (MB) | 238 (237-249) | 243 (240-251) | +2.3% (+5.5 MB, noise) |
-| RssAnon @ edit 20 (MB) | 244 (225-251) | 246 (245-251) | +0.5% (+1.3 MB, noise) |
-
-### issue-11189:bundled-gc
-
-3 rounds, load 0.1 to 1.1.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 909 (840-951) | 404 (394-409) | -55.5% (-504 MB) |
-| process cpu time | 2.08s (2.07s-2.18s) | 2.40s (2.29s-2.41s) | +15.1% |
-| ready | 516ms (514ms-521ms) | 524ms (519ms-527ms) | +1.6% (noise) |
-| crawled urls | 2 (2-2) | 2 (2-2) | 0.0% (noise) |
-| RssAnon @ after load (MB) | 373 (366-374) | 250 (250-254) | -32.8% (-122 MB) |
-| RssAnon @ edit 5 (MB) | 576 (547-605) | 255 (250-255) | -55.7% (-321 MB) |
-| RssAnon @ edit 10 (MB) | 701 (665-727) | 268 (262-290) | -61.8% (-433 MB) |
-| RssAnon @ edit 15 (MB) | 755 (728-818) | 261 (258-263) | -65.4% (-494 MB) |
-| RssAnon @ edit 20 (MB) | 828 (764-871) | 280 (275-282) | -66.2% (-548 MB) |
-
-### issue-11189:bundled-tailwind-leaf
-
-3 rounds, load 0.1 to 0.5.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 492 (484-514) | 405 (398-406) | -17.7% (-87.0 MB) |
-| process cpu time | 1.05s (976ms-1.15s) | 1.19s (1.05s-1.21s) | +12.6% (noise) |
-| ready | 511ms (509ms-517ms) | 518ms (513ms-524ms) | +1.4% (noise) |
-| crawled urls | 7 (7-7) | 7 (7-7) | 0.0% (noise) |
-| RssAnon @ after load (MB) | 416 (410-439) | 287 (285-288) | -31.0% (-129 MB) |
-| RssAnon @ edit 5 (MB) | 403 (399-423) | 264 (262-270) | -34.6% (-140 MB) |
-| RssAnon @ edit 10 (MB) | 404 (400-424) | 264 (264-270) | -34.5% (-139 MB) |
-| RssAnon @ edit 15 (MB) | 404 (400-424) | 270 (264-275) | -33.1% (-134 MB) |
-| RssAnon @ edit 20 (MB) | 404 (400-424) | 280 (265-286) | -30.7% (-124 MB) |
+| RssAnon @ after load (MB) | 382 (370-391) | 260 (259-267) | -32.0% (-122 MB) |
+| RssAnon @ edit 5 (MB) | 583 (578-604) | 250 (244-251) | -57.2% (-333 MB) |
+| RssAnon @ edit 10 (MB) | 718 (709-720) | 270 (268-271) | -62.4% (-448 MB) |
+| RssAnon @ edit 15 (MB) | 801 (788-808) | 274 (258-278) | -65.8% (-527 MB) |
+| RssAnon @ edit 20 (MB) | 851 (836-860) | 282 (266-297) | -66.8% (-568 MB) |
 
 ## lobehub
 
@@ -394,59 +235,41 @@ lobehub SPA. Issues: [#9330](https://github.com/rolldown/rolldown/issues/9330).
 
 ### lobehub:build
 
-3 rounds, load 1 to 2.7.
+3 rounds, load 0.8 to 3.8.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 6061 (5958-6128) | 5045 (4969-5050) | -16.8% (-1016 MB) |
-| process wall time | 24.84s (24.65s-25.69s) | 25.08s (24.79s-25.59s) | +1.0% (noise) |
-| process cpu time | 44.49s (44.21s-45.57s) | 44.63s (44.40s-45.38s) | +0.3% (noise) |
+| peak VmHWM (MB) | 5947 (5890-6223) | 4969 (4772-5134) | -16.5% (-978 MB) |
+| process wall time | 25.45s (25.29s-25.67s) | 25.14s (25.07s-25.15s) | -1.2% |
+| process cpu time | 45.46s (45.20s-45.69s) | 44.89s (44.84s-45.01s) | -1.3% |
 
 ### lobehub:build-sourcemap
 
-9 rounds, load 1.6 to 2.6.
+3 rounds, load 2.7 to 3.7.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 7109 (6831-7890) | 5988 (5483-6416) | -15.8% (-1122 MB) |
-| process wall time | 27.64s (27.17s-28.48s) | 27.43s (27.06s-27.86s) | -0.8% (noise) |
-| process cpu time | 48.65s (47.82s-50.59s) | 48.42s (47.95s-49.39s) | -0.5% (noise) |
+| peak VmHWM (MB) | 6931 (6928-7355) | 5594 (5196-5645) | -19.3% (-1337 MB) |
+| process wall time | 27.78s (27.46s-27.97s) | 27.95s (27.15s-28.14s) | +0.6% (noise) |
+| process cpu time | 49.40s (48.53s-49.49s) | 49.92s (48.58s-50.17s) | +1.1% (noise) |
 
 ### lobehub:dev
 
-3 rounds, load 0.1 to 1.6.
+3 rounds, load 0.3 to 3.1.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 3913 (3898-3957) | 2948 (2928-2961) | -24.7% (-965 MB) |
-| process cpu time | 62.95s (62.82s-63.13s) | 62.72s (62.46s-63.07s) | -0.4% (noise) |
-| ready | 2.72s (1.71s-2.72s) | 2.72s (2.69s-2.77s) | +0.2% (noise) |
-| page load | 14.53s (14.26s-15.17s) | 14.36s (14.24s-14.70s) | -1.2% (noise) |
-| page requests | 10536 (10534-10541) | 10526 (10221-10569) | -0.1% (noise) |
-| failed requests | 6 (6-7) | 6 (6-6) | 0.0% (noise) |
-| RssAnon @ ready (MB) | 1325 (497-1381) | 1247 (1153-1257) | -5.9% (-77.6 MB, noise) |
-| RssAnon @ page closed (MB) | 3682 (3654-3729) | 1912 (1858-2850) | -48.1% (-1771 MB) |
-| RssAnon @ idle 90s (MB) | 2701 (2670-2819) | 1010 (974-1055) | -62.6% (-1691 MB) |
-| RssAnon @ idle 180s (MB) | 2703 (2670-2845) | 1015 (1003-1143) | -62.4% (-1688 MB) |
-| RssAnon @ idle 270s (MB) | 2792 (2720-2913) | 1112 (1091-1244) | -60.2% (-1680 MB) |
-
-### lobehub:dev-warm
-
-3 rounds.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2234 (2039-3048) | 2001 (1908-2005) | -10.4% (-233 MB) |
-| process cpu time | 52.35s (51.95s-52.99s) | 51.85s (51.47s-53.43s) | -1.0% (noise) |
-| ready | 1.46s (1.45s-1.48s) | 1.44s (1.43s-1.48s) | -1.2% (noise) |
-| page load | 11.59s (11.39s-11.66s) | 11.52s (11.36s-11.73s) | -0.6% (noise) |
-| page requests | 10459 (10174-10539) | 10582 (10529-10637) | +1.2% (noise) |
+| peak VmHWM (MB) | 3870 (3859-3902) | 2880 (2879-2972) | -25.6% (-990 MB) |
+| process cpu time | 64.97s (64.11s-67.07s) | 65.00s (64.20s-67.06s) | +0.1% (noise) |
+| ready | 2.37s (1.67s-2.75s) | 2.66s (2.54s-2.70s) | +12.4% (noise) |
+| page load | 15.70s (15.38s-18.01s) | 16.15s (15.32s-16.46s) | +2.8% (noise) |
+| page requests | 10307 (9935-10539) | 10270 (10266-10465) | -0.4% (noise) |
 | failed requests | 6 (6-6) | 6 (6-6) | 0.0% (noise) |
-| RssAnon @ ready (MB) | 484 (479-495) | 406 (391-417) | -16.1% (-78.2 MB) |
-| RssAnon @ page closed (MB) | 2145 (1959-2967) | 1914 (1804-1920) | -10.8% (-231 MB) |
-| RssAnon @ idle 90s (MB) | 967 (941-1014) | 856 (848-877) | -11.5% (-111 MB) |
-| RssAnon @ idle 180s (MB) | 962 (954-967) | 867 (848-877) | -9.8% (-94.5 MB) |
-| RssAnon @ idle 270s (MB) | 962 (957-967) | 877 (867-884) | -8.8% (-85.1 MB) |
+| RssAnon @ ready (MB) | 841 (480-1372) | 1107 (892-1151) | +31.7% (+267 MB, noise) |
+| RssAnon @ page closed (MB) | 3694 (3531-3782) | 1895 (1890-2873) | -48.7% (-1799 MB) |
+| RssAnon @ idle 90s (MB) | 2707 (2677-2767) | 1043 (1024-1075) | -61.5% (-1664 MB) |
+| RssAnon @ idle 180s (MB) | 2764 (2760-2840) | 1114 (1111-1143) | -59.7% (-1650 MB) |
+| RssAnon @ idle 270s (MB) | 2829 (2808-2869) | 1224 (1199-1238) | -56.7% (-1605 MB) |
 
 ## rolldown-9330-repro
 
@@ -454,19 +277,19 @@ Small #9330 repro, vite dev with @lobehub/ui. Issues: [#9330](https://github.com
 
 ### rolldown-9330-repro:dev
 
-3 rounds, load 0.1 to 0.1.
+3 rounds, load 0.2 to 0.3.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2814 (2776-2838) | 2067 (2012-2087) | -26.5% (-746 MB) |
-| process cpu time | 3.57s (3.53s-3.71s) | 3.59s (3.49s-3.79s) | +0.8% (noise) |
-| ready | 522ms (513ms-523ms) | 524ms (522ms-525ms) | +0.4% (noise) |
-| page load | 1.28s (1.22s-1.33s) | 1.27s (1.25s-1.42s) | -0.5% (noise) |
+| peak VmHWM (MB) | 2737 (2710-2797) | 2055 (2039-2059) | -24.9% (-682 MB) |
+| process cpu time | 3.79s (3.66s-3.88s) | 3.52s (3.52s-3.65s) | -7.1% |
+| ready | 523ms (519ms-524ms) | 523ms (514ms-526ms) | 0.0% (noise) |
+| page load | 1.32s (1.25s-1.40s) | 1.26s (1.23s-1.28s) | -4.8% (noise) |
 | page requests | 7 (7-7) | 7 (7-7) | 0.0% (noise) |
 | failed requests | 0 (0-0) | 0 (0-0) | - |
-| RssAnon @ ready (MB) | 1586 (1549-1595) | 1313 (1308-1315) | -17.2% (-273 MB) |
-| RssAnon @ page closed (MB) | 2212 (2172-2233) | 412 (405-427) | -81.4% (-1801 MB) |
-| RssAnon @ idle 90s (MB) | 2212 (2172-2233) | 508 (492-533) | -77.0% (-1705 MB) |
+| RssAnon @ ready (MB) | 1526 (1512-1552) | 1286 (1276-1302) | -15.7% (-240 MB) |
+| RssAnon @ page closed (MB) | 2133 (2108-2195) | 446 (435-452) | -79.1% (-1687 MB) |
+| RssAnon @ idle 90s (MB) | 2133 (2108-2195) | 537 (523-538) | -74.8% (-1596 MB) |
 
 ## vinext
 
@@ -474,23 +297,13 @@ vinext, Next.js on Vite.
 
 ### vinext:build
 
-3 rounds, load 1 to 1.1.
+3 rounds, load 0.1 to 0.2.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 1129 (1099-1130) | 784 (777-802) | -30.6% (-345 MB) |
-| process wall time | 1.44s (1.42s-1.44s) | 1.43s (1.42s-1.45s) | -0.8% (noise) |
-| process cpu time | 2.46s (2.46s-2.54s) | 2.50s (2.45s-2.55s) | +1.2% (noise) |
-
-### vinext:playground-build
-
-3 rounds, load 1.1 to 1.7.
-
-|  | base | pr | pr vs base |
-| --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2032 (2025-2244) | 1691 (1656-1709) | -16.8% (-341 MB) |
-| process wall time | 4.83s (4.74s-4.86s) | 4.30s (4.28s-4.32s) | -11.0% |
-| process cpu time | 8.09s (7.97s-8.15s) | 7.22s (7.16s-7.28s) | -10.8% |
+| peak VmHWM (MB) | 1101 (1079-1122) | 817 (804-826) | -25.8% (-285 MB) |
+| process wall time | 1.44s (1.42s-1.45s) | 1.47s (1.44s-1.48s) | +1.9% (noise) |
+| process cpu time | 2.52s (2.47s-2.54s) | 2.53s (2.50s-2.57s) | +0.2% (noise) |
 
 ## vue-vben-admin
 
@@ -498,10 +311,10 @@ vue-vben-admin, the web-antd app.
 
 ### vue-vben-admin:build
 
-3 rounds, load 1.6 to 1.8.
+3 rounds, load 0.3 to 1.1.
 
 |  | base | pr | pr vs base |
 | --- | ---: | ---: | ---: |
-| peak VmHWM (MB) | 2164 (2150-2199) | 1743 (1699-1755) | -19.4% (-421 MB) |
-| process wall time | 3.05s (3.05s-3.09s) | 3.15s (3.06s-3.20s) | +3.1% (noise) |
-| process cpu time | 6.19s (6.11s-6.28s) | 6.28s (6.20s-6.39s) | +1.5% (noise) |
+| peak VmHWM (MB) | 2179 (2154-2192) | 1730 (1724-1750) | -20.6% (-449 MB) |
+| process wall time | 3.11s (3.06s-3.13s) | 3.09s (3.08s-3.20s) | -0.8% (noise) |
+| process cpu time | 6.29s (6.24s-6.36s) | 6.22s (6.21s-6.33s) | -1.2% (noise) |
