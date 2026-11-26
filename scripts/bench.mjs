@@ -20,7 +20,8 @@ const HELP = `Usage (\`just bench\` is \`run\`):
   node scripts/bench.mjs report <results.json> ... [--out <file>]
   node scripts/bench.mjs selftest
 
-A name is a case or a project from \`list\`, or a group: cases (the default), projects, all.
+A name is a case or a project from \`list\`, or a group: cases (the default), projects, all, quick.
+quick is the cases a PR description reports, with 3 rounds each. \`case:a,b\` runs two variants.
 
 --pr <number> is the pkg.pr.new preview of a PR. --local is the rolldown repo next to this one
 (../rolldown), and --local=<path> another repo or worktree. With only one of --pr, --local or
@@ -116,8 +117,24 @@ function caseInfo(defs) {
   return info;
 }
 
+// The cases a PR description reports, for a shorter run. A list of variants runs after one warm-up.
+const QUICK = [
+  'held-outputs:sourcemap',
+  'issue-10985-tight-loop:close',
+  'issue-11143-api-idle:6-builds',
+  'issue-11233-optimizer-threads:default-threads',
+  'many-chunks:sourcemap',
+  'rebuild-gaps',
+  'three10x:sourcemap',
+  'issue-11189:bundled',
+  'lobehub:build,build-sourcemap,dev',
+  'rolldown-9330-repro:dev',
+  'vinext:build',
+  'vue-vben-admin:build',
+];
+
 function select(names, defs) {
-  const groups = { cases: [...defs.cases.keys()], projects: [...defs.projects.keys()] };
+  const groups = { cases: [...defs.cases.keys()], projects: [...defs.projects.keys()], quick: QUICK };
   groups.all = [...groups.cases, ...groups.projects];
   const expanded = (names.length ? names : ['cases']).flatMap((name) => groups[name] ?? [name]);
   return expanded.map((name) => {
@@ -125,7 +142,7 @@ function select(names, defs) {
     const kind = defs.cases.has(id) ? 'case' : defs.projects.has(id) ? 'project' : null;
     if (!kind) throw new Error(`Unknown case "${id}". Run \`just list\`.`);
     const def = (kind === 'case' ? defs.cases : defs.projects).get(id);
-    const selected = sub ? [sub] : Object.keys(def.variants);
+    const selected = sub ? sub.split(',') : Object.keys(def.variants);
     for (const v of selected) if (!def.variants[v]) throw new Error(`${id} has no variant "${v}"`);
     return { kind, id, ...def, selected };
   });
@@ -279,7 +296,7 @@ async function run(names) {
 
   for (const job of jobs) {
     const input = await setup(job, bins[0]);
-    const rounds = roundsOption ?? job.meta.rounds ?? 3;
+    const rounds = roundsOption ?? (names.includes('quick') ? 3 : (job.meta.rounds ?? 3));
     // The first run of a case reads its files from disk, and it was up to 50% slower.
     if (!values['no-warmup']) {
       const variant = job.selected[0];

@@ -83,7 +83,15 @@ that binding and no other one.
 ## Names
 
 `just bench` takes case names, `case:variant`, `project:case`, or a group: `cases` (every API
-case, the default), `projects`, `all`.
+case, the default), `projects`, `all`, `quick`. `case:a,b` runs several variants of a case after
+one warm-up.
+
+`quick` runs only the cases a PR description reports, with 3 rounds each instead of 5 for the API
+cases. On the Linux VM it takes about 70 minutes, against more than two hours for `all`:
+
+```sh
+just bench quick --bin base=../rolldown-wt-base --bin pr=../rolldown-wt-11655
+```
 
 ## How a run works
 
